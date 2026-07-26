@@ -59,7 +59,8 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
-    # Shared with release.yml's docs job so the two never deploy at once.
+    # Pages has one deployer — this workflow, from main. Serialised so two
+    # quick pushes queue instead of racing for the environment.
     concurrency:
       group: github-pages
       cancel-in-progress: false

@@ -256,6 +256,9 @@ $ git tag v1.0.0 && git push origin v1.0.0
   an SBOM)
 - `tns-mirror-client` → PyPI (trusted publishing, with build attestations)
 
+The documentation site deploys separately, from `main`, whenever `docs/`
+changes — releases are cut from `main`, so it is already current.
+
 They version independently — the server tracks the project, the client tracks the
 schema major — and nothing publishes until the full test suite and the scanners
 pass.
