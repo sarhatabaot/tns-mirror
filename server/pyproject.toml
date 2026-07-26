@@ -28,7 +28,7 @@ classifiers = [
 # attack surface in a published image (design §8).
 dependencies = [
   "requests>=2.32.3",
-  "psycopg[binary]>=3.2.3",
+  "psycopg[binary]>=3.3.4",
   "PyYAML>=6.0.2",
 ]
 
