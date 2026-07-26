@@ -24,7 +24,7 @@ jobs:
     name: secrets (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history: a credential committed and then "removed" is still a
           # leaked credential.
@@ -44,8 +44,8 @@ jobs:
     name: sast (bandit + semgrep)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
 
       - name: Bandit
         run: |
@@ -73,8 +73,8 @@ jobs:
     name: deps (pip-audit + trivy fs)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
 
       # Each package is audited at its own floor: the server at its
       # .python-version, the client at 3.11, which is the resolution consumers
@@ -100,7 +100,7 @@ jobs:
     name: waiver expiry
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # A suppression without an expiry becomes a permanent hole that nobody
       # revisits. The expiry is enforced here, not left as a rotting comment.
       - name: Check for expired suppressions
