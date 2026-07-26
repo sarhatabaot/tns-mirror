@@ -1,0 +1,169 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  versions:
+    name: versions agree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/check_versions.py
+
+  server:
+    name: server
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Pin to .python-version rather than the runner's ambient Python: a
+      # single-version lockfile hash-mismatches under a different interpreter.
+      - name: Set up Python
+        run: uv python install "$(cat .python-version)"
+
+      - run: uv sync --frozen --all-groups
+
+      - name: Ruff (lint)
+        run: uv run ruff check .
+
+      - name: Ruff (format check)
+        run: uv run ruff format --check .
+
+      - name: Unit tests
+        run: uv run pytest --cov=tns_mirror_server --cov-report=term-missing
+
+      - name: Store integration tests
+        env:
+          TNS_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+        run: uv run pytest -m integration
+
+      # The migrations are the source of truth; the published contract must not
+      # drift from them, because consumers in other languages read only the
+      # published file.
+      - name: Published schema contract is current
+        run: uv run python scripts/render_schema.py --check
+
+  client:
+    name: client
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv sync --frozen --all-groups
+
+      - name: Ruff (lint)
+        run: uv run ruff check .
+
+      - name: Ruff (format check)
+        run: uv run ruff format --check .
+
+      # Includes the contract test: the client's model is checked against
+      # schema/schema_v1.sql, which is the only thing binding it to the server.
+      - name: Unit and contract tests
+        run: uv run pytest --cov=tns_mirror_client --cov-report=term-missing
+
+      # Seeded from the published contract, so these exercise what a consumer
+      # would actually connect to.
+      - name: Integration tests
+        env:
+          TNS_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+        run: uv run pytest -m integration
+
+  # The client claims to support 3.11+, so it is tested there, not only on the
+  # version the developers happen to run.
+  client-python-versions:
+    name: client (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install ${{ matrix.python }}
+      - run: uv sync --all-groups --python ${{ matrix.python }}
+      - run: uv run --python ${{ matrix.python }} pytest
+
+  schema-frozen:
+    name: released migrations are immutable
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Forward-only means a released migration is never edited. The runner
+      # detects this at deploy time via checksums; catching it at review time is
+      # cheaper than catching it in production.
+      - name: No edits to existing migrations
+        run: |
+          changed=$(git diff --diff-filter=MD --name-only \
+            "origin/${{ github.base_ref }}...HEAD" \
+            -- server/src/tns_mirror_server/schema/)
+          if [ -n "$changed" ]; then
+            echo "::error::released migrations were modified or deleted:"
+            echo "$changed"
+            echo "Migrations are forward-only — add a new numbered file instead."
+            exit 1
+          fi
+          echo "no released migration was modified"

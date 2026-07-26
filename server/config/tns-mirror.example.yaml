@@ -1,0 +1,48 @@
+# tns-mirror-server configuration.
+#
+# Everything here is optional — the defaults below are what the server uses when
+# no file is supplied. Every value can also be set by environment variable, and
+# the environment always wins. Point at this file with --config or
+# $TNS_MIRROR_CONFIG.
+#
+# ${VAR} and ${VAR:-default} are expanded from the environment, so secrets stay
+# out of the file itself and this can be committed (the example, not your .env).
+
+source: tns
+
+auth:
+  # "marker" — a registered TNS account's tns_marker User-Agent (a GET).
+  # "bot"    — a TNS bot's api_key submitted as form data (a POST).
+  # With neither configured the server refuses to download; there is no
+  # anonymous fallback.
+  mode: ${TNS_AUTH_MODE:-marker}
+  user_agent: ${TNS_USER_AGENT}
+  # api_key: ${TNS_API_KEY}
+  # bot_id: ${TNS_BOT_ID}
+  # bot_name: ${TNS_BOT_NAME}
+
+download:
+  url: https://www.wis-tns.org/system/files/tns_public_objects/tns_public_objects.csv.zip
+  timeout_seconds: 120
+  # Seconds between consecutive downloads during catch-up. TNS rate-limits; a
+  # 429 stops catch-up early rather than hammering it.
+  throttle_seconds: 10
+  # Transient zip/csv working area. Safe to wipe — costs one re-download.
+  workdir: /var/lib/tns-mirror
+
+database:
+  # Write credentials for the mirror's own database. Consumers never get these;
+  # they get a separate read-only role (tns-mirror-server print-grants).
+  dsn: ${DATABASE_URL}
+  schema: public
+  table: tns_objects
+
+# Used only by `serve`. Kubernetes deployments run CronJobs against the one-shot
+# commands instead and ignore this section. All times are UTC, because TNS
+# stages its hourly files on UT hours.
+schedule:
+  full_cron: "0 0 * * *"      # daily full snapshot
+  delta_cron: "10 * * * *"    # hourly delta
+  catchup_cron: "30 0 * * *"  # daily 24h catch-up; repairs hours missed downtime
+  catchup_hours: 1            # window applied by the hourly job
+  catchup_window_hours: 24    # window applied by the daily catch-up job

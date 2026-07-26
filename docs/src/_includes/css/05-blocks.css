@@ -1,0 +1,331 @@
+/* ==========================================================================
+   BLOCKS — the few things a Composition and a Utility genuinely cannot express.
+   Each stays small: layout belongs to the Compositions these sit inside.
+   ========================================================================== */
+
+/* --- skip link ----------------------------------------------------------- */
+
+.skip-link {
+  position: absolute;
+  inset-inline-start: var(--space-s);
+  inset-block-start: var(--space-s);
+  z-index: 10;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--radius);
+}
+
+/* --- masthead ------------------------------------------------------------ */
+
+.masthead {
+  background: var(--color-surface);
+  border-block-end: var(--border);
+  padding-block: var(--space-xs);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.brand {
+  --gutter: var(--space-2xs);
+  --cluster-align: baseline;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.brand__version {
+  border: var(--border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: var(--space-3xs) var(--space-2xs);
+}
+
+/* --- icon buttons -------------------------------------------------------- */
+
+.icon-button {
+  align-items: center;
+  background: none;
+  border: var(--border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  padding: var(--space-2xs);
+}
+
+.icon-button:hover {
+  background: var(--color-surface-raised);
+  color: var(--color-accent);
+}
+
+.icon {
+  block-size: 1.15rem;
+  inline-size: 1.15rem;
+  /* Outline icons by default; .icon--filled opts out for the GitHub mark. */
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon--filled {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* Only one of the sun/moon pair shows: the theme clicking would switch you TO.
+   In light mode that is the moon; the dark rules in the Exceptions layer swap
+   it for the sun. */
+.icon--light {
+  display: none;
+}
+
+/* --- search -------------------------------------------------------------- */
+
+.search {
+  inline-size: min(16rem, 40vw);
+}
+
+/* Pagefind ships its own stylesheet; these align it with the site's tokens
+   rather than restyling it wholesale. */
+.search .pagefind-ui__search-input {
+  background: var(--color-bg);
+  border: var(--border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-family: var(--font-base);
+  font-size: var(--size-step--1);
+  padding: var(--space-2xs) var(--space-xs);
+  inline-size: 100%;
+}
+
+.search .pagefind-ui__drawer {
+  background: var(--color-surface-raised);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px var(--color-shadow);
+  inline-size: min(28rem, 90vw);
+  inset-inline-end: 0;
+  max-block-size: 70vh;
+  overflow-y: auto;
+  padding: var(--space-xs);
+  position: absolute;
+  z-index: 20;
+}
+
+.search .pagefind-ui__result-link {
+  color: var(--color-accent);
+}
+
+.search .pagefind-ui__result-excerpt,
+.search .pagefind-ui__message {
+  color: var(--color-text-muted);
+  font-size: var(--size-step--1);
+}
+
+.search .pagefind-ui__result mark {
+  background: var(--color-accent-bg);
+  color: inherit;
+}
+
+/* --- site navigation ----------------------------------------------------- */
+
+.site-nav {
+  --flow-space: var(--space-l);
+  font-size: var(--size-step--1);
+  position: sticky;
+  top: 4.5rem;
+  max-block-size: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 55rem) {
+  .site-nav {
+    position: static;
+    max-block-size: none;
+    border-block-end: var(--border);
+    padding-block-end: var(--space-m);
+  }
+}
+
+.site-nav__heading {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* Says who each section is for, so a reader who only uses the client knows
+   immediately which half of the documentation is theirs. */
+.site-nav__blurb {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  margin-block: var(--space-3xs) var(--space-2xs);
+}
+
+.site-nav__link {
+  border-radius: var(--radius);
+  color: var(--color-text);
+  display: block;
+  margin-inline-start: calc(var(--space-xs) * -1);
+  padding: var(--space-3xs) var(--space-xs);
+  text-decoration: none;
+}
+
+.site-nav__link:hover {
+  background: var(--color-surface);
+}
+
+.site-nav__link:hover span {
+  text-decoration: underline;
+}
+
+/* External links carry a mark, so it is obvious which ones leave the site. */
+.icon--inline {
+  block-size: 0.85em;
+  inline-size: 0.85em;
+  margin-inline-start: 0.35em;
+  opacity: 0.55;
+  vertical-align: -0.05em;
+}
+
+.site-nav__link:hover .icon--inline {
+  opacity: 1;
+}
+
+/* --- on this page -------------------------------------------------------- */
+
+.toc {
+  font-size: var(--size-step--1);
+  position: sticky;
+  top: 4.5rem;
+  max-block-size: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 78rem) {
+  .toc {
+    display: none;
+  }
+}
+
+.toc__link {
+  border-inline-start: 2px solid var(--color-rule);
+  color: var(--color-text-muted);
+  display: block;
+  padding: var(--space-3xs) var(--space-xs);
+  text-decoration: none;
+}
+
+.toc__link:hover {
+  border-inline-start-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* --- content ------------------------------------------------------------- */
+
+/* Text is capped at a readable measure; code blocks and tables get the whole
+   column, which is the point of running the page full width. */
+.prose > :where(p, ul, ol, h1, h2, h3, h4, blockquote, .lede) {
+  max-inline-size: var(--measure);
+}
+
+.prose h2 {
+  border-block-start: var(--border);
+  padding-block-start: var(--space-s);
+  --flow-space: var(--space-xl);
+}
+
+.prose h3 {
+  --flow-space: var(--space-l);
+}
+
+.prose > table {
+  display: block;
+  overflow-x: auto;
+}
+
+/* Visible only when the heading is hovered or the link is focused, so it does
+   not clutter the text but is still reachable from the keyboard. */
+.heading-anchor {
+  color: var(--color-text-muted);
+  margin-inline-start: var(--space-2xs);
+  opacity: 0;
+  text-decoration: none;
+}
+
+:where(h2, h3):hover .heading-anchor,
+.heading-anchor:focus {
+  opacity: 1;
+}
+
+.lede {
+  color: var(--color-text-muted);
+  font-size: var(--size-step-1);
+}
+
+/* --- callout ------------------------------------------------------------- */
+
+.callout,
+.prose blockquote {
+  background: var(--color-note-bg);
+  border-inline-start: 3px solid var(--color-note-rule);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: var(--space-s) var(--space-m);
+}
+
+/* --- card ---------------------------------------------------------------- */
+
+.card {
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-s) var(--space-m);
+}
+
+.card h3 {
+  font-size: var(--size-step-1);
+}
+
+.card p {
+  color: var(--color-text-muted);
+  font-size: var(--size-step--1);
+}
+
+.card__eyebrow {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* --- footer -------------------------------------------------------------- */
+
+.site-footer {
+  background: var(--color-surface);
+  border-block-start: var(--border);
+  font-size: var(--size-step--1);
+  padding-block: var(--space-l);
+}
+
+/* The page runs full width, so the footer does too — capping it at the prose
+   measure left the text huddled in the corner of a wide screen. Two columns
+   once there is room, so the lines stay a comfortable length either way. */
+.site-footer__inner {
+  display: grid;
+  gap: var(--space-s) var(--space-2xl);
+  grid-template-columns: repeat(auto-fit, minmax(min(28rem, 100%), 1fr));
+}
+
+.site-footer__inner p {
+  margin: 0;
+}

@@ -1,0 +1,98 @@
+# tns-mirror — a complete TNS mirror in one file.
+#
+#   1. edit the two marked lines below
+#   2. docker compose up -d
+#
+# That is the whole setup. This pulls the published image, so you do not need
+# the source, a Python toolchain, or a build step.
+#
+# Every value uses the ${VAR:-default} form, so you can either edit this file
+# directly or drop a .env beside it — whichever you prefer. A .env wins.
+
+name: tns-mirror
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tnsdb}
+      POSTGRES_USER: ${POSTGRES_USER:-tns_writer}
+
+      # ┌───────────────────────────────────────────────────────────────────┐
+      # │ EDIT 1 of 2 — the database password.                              │
+      # │ Generate one with:  openssl rand -base64 24                       │
+      # └───────────────────────────────────────────────────────────────────┘
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE-ME}
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Not published to the host: the mirror's database is not an internet-facing
+    # service. Uncomment to reach it from your machine — it binds to localhost
+    # only, which is deliberate.
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tns_writer} -d ${POSTGRES_DB:-tnsdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  server:
+    image: sarhatabaot/tns-mirror-server:${TNS_MIRROR_VERSION:-latest}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # ┌───────────────────────────────────────────────────────────────────┐
+      # │ EDIT 2 of 2 — your TNS credential.                                │
+      # │                                                                   │
+      # │ The mirror never downloads anonymously: leave this empty and the  │
+      # │ server stops with a clear message rather than hammering TNS as an │
+      # │ unknown client. Register free at https://www.wis-tns.org/ and     │
+      # │ paste your tns_marker below, keeping the single quotes.           │
+      # │                                                                   │
+      # │ Using a TNS *bot* instead? Set TNS_AUTH_MODE to "bot" and fill in │
+      # │ the three bot lines instead of this one.                          │
+      # └───────────────────────────────────────────────────────────────────┘
+      TNS_USER_AGENT: ${TNS_USER_AGENT:-}
+      # Example, with your own tns_id and name:
+      #   TNS_USER_AGENT: 'tns_marker{"tns_id":"1234","type":"user","name":"your_username"}'
+
+      TNS_AUTH_MODE: ${TNS_AUTH_MODE:-marker}
+      TNS_API_KEY: ${TNS_API_KEY:-}
+      TNS_BOT_ID: ${TNS_BOT_ID:-}
+      TNS_BOT_NAME: ${TNS_BOT_NAME:-}
+
+      # --- nothing below here needs editing ---------------------------------
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tns_writer}:${POSTGRES_PASSWORD:-CHANGE-ME}@db:5432/${POSTGRES_DB:-tnsdb}
+
+      # Seconds between downloads during a catch-up. Do not lower this without a
+      # reason: TNS rate-limits, and a 429 stops the catch-up early.
+      TNS_THROTTLE: ${TNS_THROTTLE:-10}
+
+      # Schedules, in UTC — TNS stages its hourly files on UT hours.
+      TNS_FULL_CRON: ${TNS_FULL_CRON:-0 0 * * *}
+      TNS_DELTA_CRON: ${TNS_DELTA_CRON:-10 * * * *}
+      TNS_CATCHUP_CRON: ${TNS_CATCHUP_CRON:-30 0 * * *}
+
+      # Optional YAML config. Uncomment together with the mount below.
+      # TNS_MIRROR_CONFIG: /etc/tns-mirror/tns-mirror.yaml
+
+    volumes:
+      - workdir:/var/lib/tns-mirror
+      # - ./config/tns-mirror.yaml:/etc/tns-mirror/tns-mirror.yaml:ro
+
+    restart: unless-stopped
+
+    # The server needs no privileges beyond reading its config and writing to
+    # its own database and working directory.
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+
+volumes:
+  pgdata:
+  workdir:

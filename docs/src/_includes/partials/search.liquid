@@ -1,0 +1,7 @@
+{% comment %}
+  Pagefind builds a static index from the rendered HTML at build time, so search
+  works with no server and no third-party service — the site stays a pile of
+  files. The UI mounts itself into #search once its script loads; if it has not
+  been indexed yet (a bare `eleventy --serve`), nothing renders here.
+{% endcomment %}
+<div id="search" class="search" data-pagefind-ignore></div>

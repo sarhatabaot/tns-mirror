@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Test / tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Secrets and local config — never commit a real TNS marker, bot api_key, or DSN
+.env
+.env.*
+!.env.example
+config/tns-mirror.yaml
+*.local.yaml
+
+# Documentation site
+node_modules/
+docs/_site/
+.eleventy-cache/
+
+# Downloaded catalogue working files (transient; TNS_WORKDIR)
+/var/
+work/
+*.csv
+*.csv.zip
+*.tmp
+
+design-tdd.md

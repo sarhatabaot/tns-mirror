@@ -1,0 +1,23 @@
+{% assign items = content | headings %}
+{% if items.size > 1 %}
+  <aside class="toc" aria-labelledby="toc-heading">
+    <p class="site-nav__heading" id="toc-heading">On this page</p>
+    <ul class="list-bare" role="list">
+      {% for item in items %}
+        <li>
+          <a
+            class="toc__link"
+            href="#{{ item.id }}"
+            {% if item.level == 3 %}data-depth="3"{% endif %}
+          >{{ item.text }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </aside>
+{% else %}
+  {% comment %}
+    A page with one heading or none gets no table of contents — an index of a
+    single item is noise, and the column collapses so the prose gets the space.
+  {% endcomment %}
+  <div class="toc toc--empty" aria-hidden="true"></div>
+{% endif %}

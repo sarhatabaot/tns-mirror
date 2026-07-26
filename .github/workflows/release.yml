@@ -1,0 +1,236 @@
+# Publish a GitHub Release, ship both artifacts.
+#
+#   server  ->  Docker Hub   (sarhatabaot/tns-mirror-server)
+#   client  ->  PyPI         (tns-mirror-client)
+#   docs    ->  GitHub Pages
+#
+# The server is *never* published to PyPI — it is a sync daemon, not a library,
+# and its pyproject carries the "Private :: Do Not Upload" classifier so an
+# accidental upload is refused by PyPI itself.
+#
+# To cut a release: tag the commit, then publish a Release from that tag on
+# GitHub. Publishing the Release is what triggers this.
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#   gh release create v1.0.0 --generate-notes
+#
+# Both artifacts carry one version, and **the major version is the schema
+# version**: v1.x.y speaks schema v1. A consumer pinning
+# 'tns-mirror-client>=1,<2' is therefore pinning the contract, which is the
+# thing that actually matters to them.
+#
+# Nothing publishes until the full suite and the scanners pass: a release is the
+# one moment a broken gate cannot be "fixed in the next commit".
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build, e.g. v1.0.0"
+        required: true
+      dry_run:
+        description: "Build and verify without publishing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  # A manual run publishes only when dry_run is explicitly false; a published
+  # Release always publishes.
+  PUBLISH: ${{ github.event_name == 'release' || inputs.dry_run == false }}
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: astral-sh/setup-uv@v5
+
+      # The tag must match what the code says it is, or the image and the wheel
+      # get published under a version nothing in the repository claims.
+      - name: Versions agree, and the tag matches
+        run: python3 scripts/check_versions.py --tag "$TAG"
+
+      - name: Server — lint and tests
+        working-directory: server
+        env:
+          TNS_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          uv python install "$(cat .python-version)"
+          uv sync --frozen --all-groups
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pytest
+          uv run pytest -m integration
+
+      - name: Client — lint and tests
+        working-directory: client
+        env:
+          TNS_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          uv sync --frozen --all-groups
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pytest
+          uv run pytest -m integration
+
+      - name: Published contract is current
+        run: uv run --project server python server/scripts/render_schema.py --check
+
+      - name: No expired security waivers
+        run: python3 scripts/check_waivers.py
+
+  # --- server -> Docker Hub -------------------------------------------------
+  server:
+    name: server → Docker Hub
+    runs-on: ubuntu-latest
+    needs: verify
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ vars.DOCKERHUB_REPOSITORY || 'sarhatabaot/tns-mirror-server' }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ env.TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
+            type=raw,value=latest
+
+      - name: Log in to Docker Hub
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          file: server/Dockerfile
+          push: ${{ env.PUBLISH == 'true' }}
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # --- client -> PyPI -------------------------------------------------------
+  client:
+    name: client → PyPI
+    runs-on: ubuntu-latest
+    needs: verify
+    permissions:
+      contents: read
+      # Trusted publishing: PyPI verifies this workflow's identity directly, so
+      # there is no long-lived API token to leak or rotate.
+      id-token: write
+      attestations: write
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Build sdist and wheel
+        working-directory: client
+        run: uv build
+
+      # Catches a broken README or bad metadata before it is permanently on
+      # PyPI — a version number cannot be reused once published.
+      - name: Check package metadata
+        working-directory: client
+        run: uvx twine check --strict dist/*
+
+      - name: Attest build provenance
+        if: env.PUBLISH == 'true'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: client/dist/*
+
+      - name: Publish
+        if: env.PUBLISH == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: client/dist
+          attestations: true
+
+  # --- docs -> GitHub Pages -------------------------------------------------
+  docs:
+    name: docs → GitHub Pages
+    runs-on: ubuntu-latest
+    needs: verify
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Build site
+        working-directory: docs
+        env:
+          ELEVENTY_PATH_PREFIX: /${{ github.event.repository.name }}/
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/_site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

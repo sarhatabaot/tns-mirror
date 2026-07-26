@@ -1,0 +1,22 @@
+# Security waivers.
+#
+# Every suppression anywhere in this repo — a Bandit `# nosec`, a Semgrep
+# `nosemgrep`, a Trivy `.trivyignore` entry, a pinned-but-vulnerable dependency —
+# is registered here with a justification, a named owner, and an expiry date.
+#
+# scripts/check_waivers.py fails CI once an expiry passes. That is the point: a
+# waiver is a decision made under particular circumstances, and it should have to
+# be re-made when those circumstances may have changed.
+#
+# Required fields: id, reason, expires (YYYY-MM-DD), owner.
+#
+#   - id: BANDIT-B608-store-postgres
+#     tool: bandit
+#     reason: >-
+#       Identifiers are interpolated because SQL has no parameter form for them;
+#       both are validated against ^[a-z_][a-z0-9_]{0,62}$ at config load and
+#       again at render time.
+#     expires: 2027-01-01
+#     owner: maintainers
+
+waivers: []

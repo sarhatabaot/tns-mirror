@@ -1,0 +1,17 @@
+[
+  {
+    "key": "server",
+    "title": "Server",
+    "blurb": "Run and operate a mirror."
+  },
+  {
+    "key": "client",
+    "title": "Client",
+    "blurb": "Query a mirror someone else runs."
+  },
+  {
+    "key": "project",
+    "title": "Project",
+    "blurb": "How it is built."
+  }
+]

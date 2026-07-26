@@ -1,0 +1,66 @@
+name: image
+
+# Builds and scans the image on every change. Publishing lives in release.yml,
+# which ships the image and the client together from one tag.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: dockerfile lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: server/Dockerfile
+          failure-threshold: warning
+
+  build-and-scan:
+    name: build + scan
+    runs-on: ubuntu-latest
+    # An image never builds on a leaked credential.
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          file: server/Dockerfile
+          push: false
+          load: true
+          tags: tns-mirror-server:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: tns-mirror-server:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      # A published image that cannot start is worse than no image.
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          docker run --rm tns-mirror-server:ci --version
+          docker run --rm tns-mirror-server:ci --help > /dev/null
+          test "$(docker run --rm --entrypoint id tns-mirror-server:ci -u)" = "10001"
+          echo "image runs, and runs as non-root"

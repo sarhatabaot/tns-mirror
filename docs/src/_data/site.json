@@ -1,0 +1,9 @@
+{
+  "title": "tns-mirror",
+  "tagline": "A self-hostable mirror of the TNS public objects catalogue, in SQL.",
+  "description": "Download the IAU Transient Name Server public catalogue on a schedule and keep it in a Postgres database you own. Query TNS offline, with no rate-limited API on your hot path.",
+  "repository": "https://github.com/sarhatabaot/tns-mirror",
+  "tns": "https://www.wis-tns.org",
+  "schemaVersion": 1,
+  "version": "1.0.0"
+}

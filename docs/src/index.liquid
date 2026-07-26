@@ -1,0 +1,114 @@
+---
+layout: layouts/base.liquid
+title: tns-mirror
+summary: A self-hostable mirror of the TNS public objects catalogue, in SQL.
+---
+
+<h1>Query TNS offline</h1>
+
+<p>
+  The <a href="{{ site.tns }}" rel="noopener">IAU Transient Name Server</a>
+  publishes its full object catalogue as a daily CSV snapshot plus hourly delta
+  files. <strong>tns-mirror</strong> downloads them, authenticates properly, and
+  keeps a Postgres table in sync — so you can cone-search, cross-match and join
+  against TNS locally, with no rate-limited API on your hot path.
+</p>
+
+<div class="callout" data-callout="warning">
+  <p>
+    <strong>This is not an official TNS service.</strong> It is an
+    independently-operated mirror <em>of</em> the TNS public catalogue. TNS's
+    data-use terms and citation requirements apply to the data.
+  </p>
+</div>
+
+<h2 id="which-half-is-yours">Which half is yours?</h2>
+
+<p>
+  The project is two pieces with two audiences, and most people only need one of
+  them.
+</p>
+
+<ul class="auto-grid list-bare" role="list" style="--auto-grid-min: 18rem">
+  <li class="card flow" style="--flow-space: var(--space-2xs)">
+    <p class="card__eyebrow">Server</p>
+    <h3><a href="{{ '/quickstart/' | url }}">I want to run a mirror</a></h3>
+    <p>
+      You have a TNS account and somewhere to run Docker. Bring up the server
+      with a compose file and a <code>.env</code>, and it keeps a Postgres
+      database current on its own.
+    </p>
+  </li>
+  <li class="card flow" style="--flow-space: var(--space-2xs)">
+    <p class="card__eyebrow">Client</p>
+    <h3><a href="{{ '/client/' | url }}">I want to query one</a></h3>
+    <p>
+      Somebody already runs a mirror and has given you a read-only connection
+      string. Install the client and cross-match against it — no TNS account, no
+      SQL, and nothing to operate.
+    </p>
+  </li>
+</ul>
+
+<h2 id="whats-here">What's here</h2>
+
+<div class="scroll-x">
+  <table>
+    <thead>
+      <tr><th>Artifact</th><th>Ships as</th><th>Version</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>tns-mirror-server</code></td>
+        <td>Docker image — <code>sarhatabaot/tns-mirror-server</code></td>
+        <td>v{{ site.version }}</td>
+      </tr>
+      <tr>
+        <td><code>schema/</code></td>
+        <td>the published SQL contract</td>
+        <td>v{{ site.schemaVersion }}</td>
+      </tr>
+      <tr>
+        <td><code>tns-mirror-client</code></td>
+        <td>PyPI package</td>
+        <td>v1.0 — speaks schema v{{ site.schemaVersion }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p>
+  The <strong>server</strong> downloads and writes. It does not query on anyone's
+  behalf: no cone search, no cross-matching. Consumers read the database through
+  a read-only role, and <a href="{{ '/contract/' | url }}">the schema is the
+  contract</a> between them. The <a href="{{ '/client/' | url }}">client</a> is
+  an ergonomic, typed wrapper over that same contract — never a privileged path,
+  and sharing no code with the server.
+</p>
+
+<h2 id="in-one-minute">In one minute</h2>
+
+<p>
+  Running a mirror needs a TNS account, because it never downloads anonymously.
+</p>
+
+<pre><code>git clone {{ site.repository }}
+cd tns-mirror/quickstart
+cp .env.example .env
+$EDITOR .env          # your TNS credential + a database password
+docker compose up -d</code></pre>
+
+<p>
+  On first start the server applies its migrations, takes an initial full
+  snapshot, and then follows the schedule. See
+  <a href="{{ '/quickstart/' | url }}">the quickstart</a> for the rest.
+</p>
+
+<p>Querying one somebody else runs needs neither:</p>
+
+<pre><code>pip install 'tns-mirror-client&gt;=1,&lt;2'</code></pre>
+
+<pre><code>from tns_mirror_client import TnsMirror
+
+with TnsMirror(dsn=TNS_RO_DSN) as tns:
+    hit = tns.nearest(ra=203.1, dec=10.2, radius_arcsec=3.0)</code></pre>

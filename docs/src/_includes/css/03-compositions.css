@@ -1,0 +1,77 @@
+/* ==========================================================================
+   COMPOSITIONS — layout only.
+   These arrange whatever is put inside them and know nothing about it: no
+   colour, no type, no component names. They are the skeleton the Blocks hang on.
+   ========================================================================== */
+
+/* Spans the viewport and guarantees a gutter. The site runs full width; prose
+   is kept readable by capping the text elements, not the page. */
+.wrapper {
+  margin-inline: auto;
+  max-width: var(--wrapper-max);
+  padding-inline: var(--wrapper-gutter);
+  width: 100%;
+}
+
+/* Vertical rhythm via the owl selector: every element gets space above it
+   except the first. Any child can override its own spacing with --flow-space. */
+.flow > * + * {
+  margin-block-start: var(--flow-space, var(--space-m));
+}
+
+/* Documentation layout: navigation, content, contents-of-this-page.
+   The side columns hold their width and the middle takes the rest. */
+.page {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--toc-width);
+  gap: var(--space-xl);
+  align-items: start;
+  padding-block: var(--space-xl) var(--space-2xl);
+}
+
+/* No room for the third column: fold it away before squeezing the prose. */
+@media (max-width: 78rem) {
+  .page {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  }
+}
+
+/* Single column, navigation above the content. */
+@media (max-width: 55rem) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-l);
+  }
+}
+
+/* Groups items in a row, wrapping as needed, with consistent gaps. */
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: var(--cluster-align, center);
+  gap: var(--gutter, var(--space-s));
+}
+
+/* Pushes children apart, collapsing to a stack when space runs out. */
+.repel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gutter, var(--space-s));
+}
+
+/* Fills the available width with as many equal columns as will fit. */
+.auto-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(var(--auto-grid-min, 15rem), 100%), 1fr)
+  );
+  gap: var(--gutter, var(--space-m));
+}
+
+/* Vertical padding for a page section. */
+.region {
+  padding-block: var(--region-space, var(--space-xl));
+}

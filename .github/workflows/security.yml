@@ -1,0 +1,107 @@
+# Layered scanning: one scanner is one blind spot. Every job here gates the
+# merge. A public repo also gets CodeQL, SARIF code-scanning, Dependabot and
+# secret push-protection for free — see codeql.yml and .github/dependabot.yml.
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Catches newly-disclosed CVEs in dependencies that were clean at merge time.
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a credential committed and then "removed" is still a
+          # leaked credential.
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        env:
+          GITLEAKS_VERSION: "8.28.0"
+        run: |
+          set -euo pipefail
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks detect --source . --redact --verbose --exit-code 1
+
+  sast:
+    name: sast (bandit + semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Bandit
+        run: |
+          uvx bandit -r server/src client/src \
+            --severity-level medium \
+            --confidence-level medium
+
+      # p/django is deliberately absent: there is no Django here, and rules that
+      # cannot fire are noise that trains people to ignore the scanner.
+      #
+      # --jobs 1 matches the pre-commit hook: parallel workers each open an
+      # io_uring queue and fail intermittently where locked memory is limited.
+      # A security gate that fails at random teaches people to re-run it.
+      - name: Semgrep
+        run: |
+          uvx semgrep scan \
+            --config p/python \
+            --config p/secrets \
+            --error \
+            --skip-unknown-extensions \
+            --jobs 1 \
+            server/src client/src
+
+  dependencies:
+    name: deps (pip-audit + trivy fs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      # Each package is audited at its own floor: the server at its
+      # .python-version, the client at 3.11, which is the resolution consumers
+      # on the oldest supported Python actually get.
+      - name: Set up Python
+        run: |
+          uv python install "$(cat server/.python-version)"
+          uv python install 3.11
+
+      - name: Audit locked dependencies
+        run: scripts/check_dependencies.sh
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  waivers:
+    name: waiver expiry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # A suppression without an expiry becomes a permanent hole that nobody
+      # revisits. The expiry is enforced here, not left as a rotting comment.
+      - name: Check for expired suppressions
+        run: python3 scripts/check_waivers.py

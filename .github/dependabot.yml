@@ -1,0 +1,25 @@
+# Free on public repositories. Keeps the lockfile, the base image digests and
+# the workflow action pins current, so pip-audit and Trivy have less to find.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /server
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /server
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

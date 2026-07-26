@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tns-mirror-client"
+# 1.x speaks schema v1 (see schema/README.md). The major tracks the contract,
+# not the project milestone, so consumers can pin 'tns-mirror-client>=1,<2'.
+version = "1.0.0"
+description = "Typed, read-only Python client for a tns-mirror TNS catalogue database."
+readme = "README.md"
+# Deliberately wider than the server's floor: this is embedded in other people's
+# applications, and a client that forces a Python upgrade is a client nobody adopts.
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "tns-mirror contributors" }]
+keywords = ["astronomy", "tns", "transients", "catalogue", "cone-search"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Astronomy",
+  "Typing :: Typed",
+]
+
+# One dependency. This library gets embedded in other people's applications, so
+# every dependency it carries becomes theirs — hence dataclasses, not pydantic.
+dependencies = ["psycopg[binary]>=3.1"]
+
+[project.urls]
+Homepage = "https://github.com/sarhatabaot/tns-mirror"
+Documentation = "https://github.com/sarhatabaot/tns-mirror/tree/main/client"
+Changelog = "https://github.com/sarhatabaot/tns-mirror/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.3",
+  "pytest-cov>=5.0.0",
+  "ruff>=0.7.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tns_mirror_client"]
+
+[tool.ruff]
+line-length = 96
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "S", "C4", "SIM", "RUF"]
+ignore = [
+  # 'type' shadows a builtin, but it is a schema column name and the model must
+  # use the contract's vocabulary.
+  "A003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106", "SLF001", "S608"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+  "integration: needs a live Postgres (TNS_TEST_DSN); skipped otherwise",
+]
+filterwarnings = ["error"]

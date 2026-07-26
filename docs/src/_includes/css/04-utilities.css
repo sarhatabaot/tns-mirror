@@ -1,0 +1,73 @@
+/* ==========================================================================
+   UTILITIES — one job each, always a direct expression of a token.
+   If a utility needs a second declaration to make sense, it is a Block.
+   ========================================================================== */
+
+.measure {
+  max-inline-size: var(--measure);
+}
+
+.measure-narrow {
+  max-inline-size: var(--measure-narrow);
+}
+
+.measure-none {
+  max-inline-size: none;
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-step--1 {
+  font-size: var(--size-step--1);
+}
+
+.text-step-1 {
+  font-size: var(--size-step-1);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.bg-surface {
+  background: var(--color-surface);
+}
+
+.border-block-start {
+  border-block-start: var(--border);
+}
+
+.border-block-end {
+  border-block-end: var(--border);
+}
+
+/* Wide content — a table, a diagram — scrolls inside its own box rather than
+   pushing the page sideways. */
+.scroll-x {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.flow-space-l {
+  --flow-space: var(--space-l);
+}
+
+.flow-space-xl {
+  --flow-space: var(--space-xl);
+}
+
+.list-bare {
+  list-style: none;
+  padding-inline-start: 0;
+}
+
+.visually-hidden:not(:focus):not(:active) {
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}

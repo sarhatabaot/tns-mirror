@@ -1,0 +1,134 @@
+/* ==========================================================================
+   SYNTAX — code highlighting.
+   Prism runs at build time, so the highlighted markup is in the HTML and no
+   JavaScript ships to the reader. Only the token colours live here, drawn from
+   the same tokens as the rest of the site so both themes stay coherent.
+   ========================================================================== */
+
+:root {
+  --syntax-comment: #6b7d70;
+  --syntax-punctuation: #6f6f68;
+  --syntax-keyword: #8c4a76;
+  --syntax-string: #3c6e47;
+  --syntax-number: #9a5b2c;
+  --syntax-function: #2a5f8f;
+  --syntax-variable: #8a5a1f;
+  --syntax-highlight-bg: rgb(11 92 115 / 10%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --syntax-comment: #7d8f86;
+    --syntax-punctuation: #a3a099;
+    --syntax-keyword: #d79bc4;
+    --syntax-string: #9ad4a6;
+    --syntax-number: #e0a86a;
+    --syntax-function: #86c5f0;
+    --syntax-variable: #e6c07b;
+    --syntax-highlight-bg: rgb(111 195 221 / 14%);
+  }
+}
+
+:root[data-theme="dark"] {
+  --syntax-comment: #7d8f86;
+  --syntax-punctuation: #a3a099;
+  --syntax-keyword: #d79bc4;
+  --syntax-string: #9ad4a6;
+  --syntax-number: #e0a86a;
+  --syntax-function: #86c5f0;
+  --syntax-variable: #e6c07b;
+  --syntax-highlight-bg: rgb(111 195 221 / 14%);
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+
+.token.punctuation,
+.token.operator,
+.token.entity {
+  color: var(--syntax-punctuation);
+}
+
+.token.keyword,
+.token.selector,
+.token.important,
+.token.atrule,
+.token.rule,
+.token.tag {
+  color: var(--syntax-keyword);
+}
+
+.token.string,
+.token.char,
+.token.attr-value,
+.token.regex,
+.token.inserted {
+  color: var(--syntax-string);
+}
+
+.token.number,
+.token.boolean,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: var(--syntax-number);
+}
+
+.token.function,
+.token.class-name,
+.token.builtin {
+  color: var(--syntax-function);
+}
+
+.token.variable,
+.token.property,
+.token.attr-name,
+.token.parameter {
+  color: var(--syntax-variable);
+}
+
+.token.bold {
+  font-weight: 600;
+}
+
+.token.italic {
+  font-style: italic;
+}
+
+/* Shell prompts are not part of the command — dimming them makes a block of
+   pasteable commands read as commands. */
+.language-console .token.shell-symbol,
+.language-shell-session .token.shell-symbol {
+  color: var(--syntax-comment);
+  user-select: none;
+}
+
+/* Prism marks up its own container; keep the site's block styling. */
+:where(pre[class*="language-"]) {
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  margin: 0;
+  padding: var(--space-s) var(--space-m);
+}
+
+:where(code[class*="language-"]) {
+  background: none;
+  border: 0;
+  color: inherit;
+  padding: 0;
+}
+
+/* Lines called out with {highlight} in the fence. */
+.highlight-line {
+  background: var(--syntax-highlight-bg);
+  display: block;
+  margin-inline: calc(var(--space-m) * -1);
+  padding-inline: var(--space-m);
+}

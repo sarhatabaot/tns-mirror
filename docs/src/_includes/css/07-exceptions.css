@@ -1,0 +1,70 @@
+/* ==========================================================================
+   EXCEPTIONS — state and variation, expressed as data attributes.
+   A data attribute makes the exception visible in the markup and impossible to
+   confuse with a Block's own classes.
+   ========================================================================== */
+
+/* The page you are on. Driven by aria-current, so the styling and the
+   accessibility information cannot drift apart. */
+.site-nav__link[aria-current="page"] {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Nested headings in the on-this-page list. */
+.toc__link[data-depth="3"] {
+  font-size: 0.82rem;
+  padding-inline-start: var(--space-m);
+}
+
+/* Theme toggle: show the icon for the theme you would switch *to*, so the
+   button reads as an action rather than a status. Both triggers are handled —
+   an OS preference with no explicit choice, and an explicit choice. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .icon--light {
+    display: block;
+  }
+
+  :root:not([data-theme="light"]) .icon--dark {
+    display: none;
+  }
+}
+
+:root[data-theme="dark"] .icon--light {
+  display: block;
+}
+
+:root[data-theme="dark"] .icon--dark {
+  display: none;
+}
+
+:root[data-theme="light"] .icon--light {
+  display: none;
+}
+
+:root[data-theme="light"] .icon--dark {
+  display: block;
+}
+
+/* Callout variants. The default is informational; these are the exceptions. */
+[data-callout="warning"] {
+  background: var(--color-warn-bg);
+  border-inline-start-color: var(--color-warn-rule);
+}
+
+[data-callout="plain"] {
+  background: transparent;
+  border-inline-start-color: var(--color-rule);
+}
+
+/* A region that should sit flush against the one before it. */
+[data-region="tight"] {
+  --region-space: var(--space-m);
+}
+
+/* The third column collapses to nothing on a page with no headings worth
+   indexing, rather than leaving a gap where a list would have been. */
+.toc--empty {
+  display: none;
+}

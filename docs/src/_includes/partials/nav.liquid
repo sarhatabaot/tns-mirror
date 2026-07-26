@@ -1,0 +1,46 @@
+{% capture external_icon %}<svg class="icon icon--inline" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 4h6v6M20 4l-8.5 8.5"/><path d="M18 14.5V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V7.5A1.5 1.5 0 0 1 5 6h4.5"/></svg>{% endcapture %}
+
+<nav class="site-nav flow" aria-label="Documentation">
+  {% for group in sections %}
+    {% assign pages = collections.docs | whereSection: group.key %}
+    {% if pages.size > 0 %}
+      <div class="site-nav__group">
+        <p class="site-nav__heading">{{ group.title }}</p>
+        <p class="site-nav__blurb">{{ group.blurb }}</p>
+        <ul class="list-bare" role="list">
+          {% for doc in pages %}
+            <li>
+              <a
+                class="site-nav__link"
+                href="{{ doc.url | url }}"
+                {% if doc.url == page.url %}aria-current="page"{% endif %}
+              >{{ doc.data.title }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  {% endfor %}
+
+  <div class="site-nav__group">
+    <p class="site-nav__heading">Reference</p>
+    <p class="site-nav__blurb">Leaves this site.</p>
+    <ul class="list-bare" role="list">
+      <li>
+        <a class="site-nav__link" href="{{ site.repository }}/blob/main/schema/schema_v{{ site.schemaVersion }}.sql" rel="noopener">
+          <span>schema_v{{ site.schemaVersion }}.sql</span>{{ external_icon }}
+        </a>
+      </li>
+      <li>
+        <a class="site-nav__link" href="{{ site.repository }}/blob/main/CHANGELOG.md" rel="noopener">
+          <span>Changelog</span>{{ external_icon }}
+        </a>
+      </li>
+      <li>
+        <a class="site-nav__link" href="{{ site.tns }}" rel="noopener">
+          <span>Transient Name Server</span>{{ external_icon }}
+        </a>
+      </li>
+    </ul>
+  </div>
+</nav>

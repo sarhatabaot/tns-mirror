@@ -1,0 +1,100 @@
+/* ==========================================================================
+   TOKENS — the design decisions, named once.
+   Every value below this file is a reference to a token, never a raw literal.
+   ========================================================================== */
+
+:root {
+  /* --- colour: light is the base -------------------------------------- */
+  --color-bg: #fdfdfc;
+  --color-surface: #f4f4f1;
+  --color-surface-raised: #ffffff;
+  --color-text: #1c1c1a;
+  --color-text-muted: #5f5f58;
+  --color-rule: #dedbd4;
+  --color-accent: #0b5c73;
+  --color-accent-bg: #e6f0f3;
+  --color-note-bg: #eef4f6;
+  --color-note-rule: #0b5c73;
+  --color-warn-bg: #fdf5e6;
+  --color-warn-rule: #d9a441;
+  --color-shadow: rgb(28 28 26 / 12%);
+
+  /* --- type -------------------------------------------------------------- */
+  --font-base: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* A modular scale, so sizes relate to each other rather than being picked. */
+  --size-step--1: 0.875rem;
+  --size-step-0: 1rem;
+  --size-step-1: 1.15rem;
+  --size-step-2: 1.35rem;
+  --size-step-3: 1.75rem;
+  --size-step-4: clamp(2rem, 1.6rem + 1.6vw, 2.6rem);
+
+  --leading-tight: 1.2;
+  --leading-standard: 1.65;
+
+  /* --- space ------------------------------------------------------------- */
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.4rem;
+  --space-xs: 0.6rem;
+  --space-s: 0.9rem;
+  --space-m: 1.35rem;
+  --space-l: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4.5rem;
+
+  /* --- measure and layout ------------------------------------------------ */
+  /* Prose is capped for readability even though the page runs full width;
+     code blocks and tables are allowed to use the whole column. */
+  --measure: 72ch;
+  --wrapper-max: none;
+  --wrapper-gutter: clamp(var(--space-m), 3vw, var(--space-xl));
+  --sidebar-width: 15rem;
+  --toc-width: 13rem;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --border: 1px solid var(--color-rule);
+}
+
+/* --- dark ---------------------------------------------------------------- */
+/*
+ * Two triggers, one palette. The media query is the default signal — most
+ * readers never touch a toggle — and the explicit attribute overrides it in
+ * *both* directions, so choosing light on a dark-mode machine works too.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #16171a;
+    --color-surface: #1e2024;
+    --color-surface-raised: #24272c;
+    --color-text: #e6e4e0;
+    --color-text-muted: #a3a099;
+    --color-rule: #32353b;
+    --color-accent: #6fc3dd;
+    --color-accent-bg: #17303a;
+    --color-note-bg: #17262c;
+    --color-note-rule: #6fc3dd;
+    --color-warn-bg: #2a2416;
+    --color-warn-rule: #b98c33;
+    --color-shadow: rgb(0 0 0 / 45%);
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #16171a;
+  --color-surface: #1e2024;
+  --color-surface-raised: #24272c;
+  --color-text: #e6e4e0;
+  --color-text-muted: #a3a099;
+  --color-rule: #32353b;
+  --color-accent: #6fc3dd;
+  --color-accent-bg: #17303a;
+  --color-note-bg: #17262c;
+  --color-note-rule: #6fc3dd;
+  --color-warn-bg: #2a2416;
+  --color-warn-rule: #b98c33;
+  --color-shadow: rgb(0 0 0 / 45%);
+}

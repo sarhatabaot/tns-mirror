@@ -1,0 +1,161 @@
+# Run the same gates locally that CI runs, so a red build is a surprise rather
+# than a routine. Install once:
+#
+#     uvx pre-commit install --install-hooks
+#
+# Fast checks run on every commit. The slow scanners (Semgrep, pip-audit, the
+# image lint, the docs build) run on push, where a few extra seconds is a fair
+# trade for not pushing a finding. Run everything on demand with:
+#
+#     uvx pre-commit run --all-files --hook-stage manual
+
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+fail_fast: false
+
+repos:
+  # --- hygiene --------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.sql$
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      # A TNS marker or bot api_key must never reach a commit; nor must a key.
+      - id: detect-private-key
+
+  # --- secrets --------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+
+  # --- lint and format ------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.0
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^(server|client)/
+      - id: ruff-format
+        files: ^(server|client)/
+
+  # --- sast -----------------------------------------------------------------
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.6
+    hooks:
+      - id: bandit
+        args: [--severity-level, medium, --confidence-level, medium]
+        files: ^(server|client)/src/
+
+  # --- local: the project's own gates ---------------------------------------
+  - repo: local
+    hooks:
+      - id: server-tests
+        name: server unit tests (no network, no database)
+        entry: scripts/run_tests.sh
+        args: [server]
+        language: script
+        pass_filenames: false
+        files: ^server/
+
+      # Includes the contract test, which is what stops the client and the
+      # published schema drifting apart. It needs no database, so it runs here.
+      - id: client-tests
+        name: client unit + contract tests
+        entry: scripts/run_tests.sh
+        args: [client]
+        language: script
+        pass_filenames: false
+        files: ^(client/|schema/)
+
+      # The migrations are the source of truth; consumers read the published
+      # file. Catching drift here is cheaper than catching it in review.
+      - id: schema-contract
+        name: published schema contract is current
+        entry: uv run --project server --frozen python server/scripts/render_schema.py --check
+        language: system
+        pass_filenames: false
+        files: ^(server/src/tns_mirror_server/schema/|schema/)
+
+      # Forward-only means forward-only. The server detects an edited migration
+      # at deploy time via checksums; this refuses to let one be committed.
+      - id: migrations-immutable
+        name: released migrations are not edited
+        entry: scripts/check_migrations_immutable.sh
+        language: script
+        pass_filenames: false
+        files: ^server/src/tns_mirror_server/schema/
+
+      - id: waiver-expiry
+        name: no expired security waivers
+        entry: python3 scripts/check_waivers.py
+        language: system
+        pass_filenames: false
+
+      # The version is restated in five files and its major must equal the
+      # schema version. Drift is invisible until a release publishes the wrong
+      # number, which cannot be taken back.
+      - id: versions-agree
+        name: versions agree across the project
+        entry: python3 scripts/check_versions.py
+        language: system
+        pass_filenames: false
+        files: ^(server/pyproject\.toml|client/pyproject\.toml|docs/src/_data/site\.json|.*/__init__\.py|client/src/tns_mirror_client/client\.py)$
+
+  # --- slower gates: on push ------------------------------------------------
+  - repo: https://github.com/semgrep/semgrep
+    rev: v1.145.0
+    hooks:
+      - id: semgrep
+        # p/django is deliberately absent: there is no Django here, and rules
+        # that cannot fire are noise that trains people to ignore the scanner.
+        #
+        # --jobs 1 is not a performance choice. Each parallel worker opens its
+        # own io_uring queue, and on a machine with a low locked-memory limit
+        # that fails with "Out of memory io_uring_queue_init" — intermittently,
+        # which is the worst way for a security gate to fail. This codebase is
+        # 16 files; determinism is worth the couple of seconds.
+        args:
+          - --config=p/python
+          - --config=p/secrets
+          - --error
+          - --skip-unknown-extensions
+          - --jobs=1
+        files: ^(server|client)/src/
+        stages: [pre-push, manual]
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.14.0
+    hooks:
+      - id: hadolint-docker
+        args: [--failure-threshold, warning]
+        files: Dockerfile$
+        stages: [pre-push, manual]
+
+  - repo: local
+    hooks:
+      - id: pip-audit
+        name: audit locked dependencies
+        entry: scripts/check_dependencies.sh
+        language: script
+        pass_filenames: false
+        files: ^(server|client)/(uv\.lock|pyproject\.toml)$
+        stages: [pre-push, manual]
+
+      - id: docs-build
+        name: documentation site builds
+        entry: scripts/check_docs.sh
+        language: script
+        pass_filenames: false
+        files: ^docs/
+        stages: [pre-push, manual]
