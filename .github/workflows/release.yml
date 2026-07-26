@@ -136,9 +136,12 @@ jobs:
           [ -n "$TOKEN" ] || missing="$missing DOCKERHUB_TOKEN"
           if [ -n "$missing" ]; then
             echo "::error::missing secret(s):$missing"
-            echo "Add them under Settings -> Environments -> release ->" >&2
-            echo "Environment secrets. Repository-level secrets are NOT visible" >&2
-            echo "to a job that declares 'environment: release'." >&2
+            echo "Add them either as repository secrets (Settings -> Secrets" >&2
+            echo "and variables -> Actions) or as secrets on the 'release'" >&2
+            echo "environment. Both are visible here; an environment secret" >&2
+            echo "just takes precedence over a repository one of the same name." >&2
+            echo "DOCKERHUB_TOKEN is a Docker Hub access token with Read/Write," >&2
+            echo "not an account password." >&2
             exit 1
           fi
           echo "registry credentials present"
