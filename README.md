@@ -249,7 +249,7 @@ One tag ships both artifacts, from one CI run, so the published pair is always a
 combination that was tested together:
 
 ```console
-$ git tag v1.0.0 && git push origin v1.0.0
+$ git tag 1.0.1 && git push origin 1.0.1
 ```
 
 - `sarhatabaot/tns-mirror-server` → Docker Hub (multi-arch, with provenance and

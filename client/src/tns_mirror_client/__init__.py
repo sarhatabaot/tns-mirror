@@ -22,7 +22,7 @@ from .errors import MirrorUnavailable, SchemaVersionError, TnsMirrorClientError
 from .geometry import angular_separation_deg, bounding_box
 from .models import MirrorMeta, TnsObject
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 __all__ = [
     "SCHEMA_VERSION",

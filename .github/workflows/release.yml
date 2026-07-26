@@ -16,8 +16,8 @@
 # To cut a release: tag the commit, then publish a Release from that tag on
 # GitHub. Publishing the Release is what triggers this.
 #
-#   git tag v1.0.0 && git push origin v1.0.0
-#   gh release create v1.0.0 --generate-notes
+#   git tag 1.0.1 && git push origin 1.0.1
+#   gh release create 1.0.1 --generate-notes
 #
 # Both artifacts carry one version, and **the major version is the schema
 # version**: v1.x.y speaks schema v1. A consumer pinning
@@ -34,7 +34,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to build, e.g. v1.0.0"
+        description: "Tag to build, e.g. 1.0.1"
         required: true
       dry_run:
         description: "Build and verify without publishing"

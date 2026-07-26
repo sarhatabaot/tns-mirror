@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "tns-mirror-client"
 # 1.x speaks schema v1 (see schema/README.md). The major tracks the contract,
 # not the project milestone, so consumers can pin 'tns-mirror-client>=1,<2'.
-version = "1.0.0"
+version = "1.0.1"
 description = "Typed, read-only Python client for a tns-mirror TNS catalogue database."
 readme = "README.md"
 # Deliberately wider than the server's floor: this is embedded in other people's

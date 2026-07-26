@@ -10,6 +10,20 @@ schema change bumps the major on both.
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-07-26
+
+Release plumbing only — no change to the server, the client, or the schema.
+
+- The PyPI publish tolerates a version that is already present, so a release
+  whose targets fail independently can be re-run rather than needing a version
+  burned to complete it.
+- The Docker job checks its registry credentials before building, instead of
+  failing at login after a multi-architecture build.
+- Pages is no longer deployed from the release. `docs.yml` already deploys it
+  from `main`, which is where releases are cut from.
+
+`1.0.0` reached PyPI but never reached Docker Hub; use `1.0.1` for the image.
+
 ## [1.0.0] — 2026-07-26
 
 First release. Schema **v1**. Two artifacts from one tag:
@@ -144,5 +158,6 @@ Several points were under-specified in the design document and resolved here:
 - **Cone search is not in the server.** It belongs to the client; the server only
   owns the `(ra, dec)` index, which is DDL and therefore contract.
 
-[Unreleased]: https://github.com/sarhatabaot/tns-mirror/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/sarhatabaot/tns-mirror/releases/tag/v1.0.0
+[Unreleased]: https://github.com/sarhatabaot/tns-mirror/compare/1.0.1...HEAD
+[1.0.1]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.1
+[1.0.0]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.0
