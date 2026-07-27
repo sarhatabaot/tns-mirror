@@ -33,12 +33,22 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: tns-mirror-server:${TNS_MIRROR_VERSION:-1.0.1}
+    image: tns-mirror-server:${TNS_MIRROR_VERSION:-1.0.2}
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-tns_writer}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tnsdb}
+      # Connection settings as discrete PG* variables rather than a URL.
+      # A password is arbitrary bytes; a URL is not. 'openssl rand -base64 24'
+      # emits '/' about 39% of the time, and a '/' ends a URL's authority
+      # section — the password silently becomes part of the host and port, and
+      # you get "failed to resolve host 'tns_writer'". libpq reads these
+      # directly, so no character in the password can change how they parse.
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-tns_writer}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-CHANGE-ME}
+      PGDATABASE: ${POSTGRES_DB:-tnsdb}
       # Operator-supplied TNS credential. See .env.example.
       TNS_AUTH_MODE: ${TNS_AUTH_MODE:-marker}
       TNS_USER_AGENT: ${TNS_USER_AGENT:-}

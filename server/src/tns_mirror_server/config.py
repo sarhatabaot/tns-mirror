@@ -234,7 +234,19 @@ class Config:
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
 
     def validate(self) -> Config:
-        self.auth.validate()
+        """Check everything that is always required.
+
+        Auth is deliberately *not* checked here. Invariant 4 is that the
+        *download* refuses without a credential — not that every command does.
+        ``migrate``, ``status`` and ``print-grants`` never contact TNS, and
+        making them demand a TNS account to touch a local database is a barrier
+        with nothing behind it: you need ``print-grants`` to create a reader, and
+        needing a TNS marker to print SQL makes no sense.
+
+        Commands that download call :meth:`AuthConfig.validate` before they
+        start, so they still fail immediately rather than mid-run, and the
+        source adapter re-checks at request time regardless.
+        """
         self.download.validate()
         self.database.validate()
         self.schedule.validate()

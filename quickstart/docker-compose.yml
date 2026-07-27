@@ -45,27 +45,39 @@ services:
         condition: service_healthy
     environment:
       # ┌───────────────────────────────────────────────────────────────────┐
-      # │ EDIT 2 of 2 — your TNS credential.                                │
+      # │ EDIT 2 of 2 — your TNS credential. Pick ONE of the two modes.     │
       # │                                                                   │
-      # │ The mirror never downloads anonymously: leave this empty and the  │
+      # │ The mirror never downloads anonymously: leave both blank and the  │
       # │ server stops with a clear message rather than hammering TNS as an │
-      # │ unknown client. Register free at https://www.wis-tns.org/ and     │
-      # │ paste your tns_marker below, keeping the single quotes.           │
-      # │                                                                   │
-      # │ Using a TNS *bot* instead? Set TNS_AUTH_MODE to "bot" and fill in │
-      # │ the three bot lines instead of this one.                          │
+      # │ unknown client. Register free at https://www.wis-tns.org/         │
       # └───────────────────────────────────────────────────────────────────┘
-      TNS_USER_AGENT: ${TNS_USER_AGENT:-}
-      # Example, with your own tns_id and name:
-      #   TNS_USER_AGENT: 'tns_marker{"tns_id":"1234","type":"user","name":"your_username"}'
 
       TNS_AUTH_MODE: ${TNS_AUTH_MODE:-marker}
+
+      # ── Mode "marker" — one value. Keep the single quotes. ──
+      TNS_USER_AGENT: ${TNS_USER_AGENT:-}
+      #   TNS_USER_AGENT: 'tns_marker{"tns_id":"1234","type":"user","name":"your_username"}'
+
+      # ── Mode "bot" — set TNS_AUTH_MODE to "bot" above, then ALL THREE of
+      #    these. A bot's api_key alone is not enough: the key authenticates
+      #    the request and the id and name identify which bot is asking, so
+      #    the server refuses unless all three are present. ──
       TNS_API_KEY: ${TNS_API_KEY:-}
       TNS_BOT_ID: ${TNS_BOT_ID:-}
       TNS_BOT_NAME: ${TNS_BOT_NAME:-}
 
       # --- nothing below here needs editing ---------------------------------
-      DATABASE_URL: postgresql://${POSTGRES_USER:-tns_writer}:${POSTGRES_PASSWORD:-CHANGE-ME}@db:5432/${POSTGRES_DB:-tnsdb}
+      # Connection settings as discrete PG* variables rather than a URL.
+      # A password is arbitrary bytes; a URL is not. 'openssl rand -base64 24'
+      # emits '/' about 39% of the time, and a '/' ends a URL's authority
+      # section — the password silently becomes part of the host and port, and
+      # you get "failed to resolve host 'tns_writer'". libpq reads these
+      # directly, so no character in the password can change how they parse.
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-tns_writer}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-CHANGE-ME}
+      PGDATABASE: ${POSTGRES_DB:-tnsdb}
 
       # Seconds between downloads during a catch-up. Do not lower this without a
       # reason: TNS rate-limits, and a 429 stops the catch-up early.

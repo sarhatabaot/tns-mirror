@@ -73,14 +73,27 @@ def test_named_config_file_that_does_not_exist_is_an_error(tmp_path):
 # --- invariant 4 ------------------------------------------------------------
 
 
+def test_loading_config_does_not_require_a_tns_credential():
+    # migrate, status and print-grants never contact TNS. Demanding a TNS
+    # account before you can create a read-only role, or look at a row count,
+    # is a barrier with nothing behind it.
+    config = load_config(None, {})
+
+    assert config.auth.user_agent == ""
+    assert config.database.table == "tns_objects"
+
+
 def test_marker_mode_without_a_marker_refuses():
+    # Invariant 4 still holds — it is checked where the download happens.
     with pytest.raises(AuthNotConfigured, match="TNS_USER_AGENT"):
-        load_config(None, {})
+        load_config(None, {}).auth.validate()
 
 
 def test_bot_mode_lists_every_missing_credential():
+    # An api_key on its own is not enough: the key authenticates the request,
+    # the id and name say which bot is asking.
     with pytest.raises(AuthNotConfigured) as excinfo:
-        load_config(None, {"TNS_AUTH_MODE": "bot", "TNS_API_KEY": "k"})
+        load_config(None, {"TNS_AUTH_MODE": "bot", "TNS_API_KEY": "k"}).auth.validate()
 
     message = str(excinfo.value)
     assert "TNS_BOT_ID" in message
@@ -98,6 +111,7 @@ def test_bot_mode_accepts_a_complete_credential_set():
             "TNS_BOT_NAME": "mirrorbot",
         },
     )
+    config.auth.validate()
     assert config.auth.mode == "bot"
 
 

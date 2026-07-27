@@ -143,7 +143,8 @@ and [`server/.env.example`](server/.env.example).
 | `TNS_AUTH_MODE` | `marker` | `marker` or `bot` |
 | `TNS_USER_AGENT` | — | required in `marker` mode |
 | `TNS_API_KEY`, `TNS_BOT_ID`, `TNS_BOT_NAME` | — | required in `bot` mode |
-| `DATABASE_URL` | — | write credentials (or the standard `PG*` variables) |
+| `PGHOST` `PGUSER` `PGPASSWORD` `PGDATABASE` | — | write credentials; preferred over a URL |
+| `DATABASE_URL` | — | alternative; percent-encode `/` and `@` in the password |
 | `TNS_SCHEMA`, `TNS_TABLE` | `public`, `tns_objects` | where the catalogue lives |
 | `TNS_URL` | the public-objects zip | |
 | `TNS_TIMEOUT`, `TNS_THROTTLE` | `120`, `10` | seconds |

@@ -10,6 +10,29 @@ schema change bumps the major on both.
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-07-27
+
+Bug-fix release. Both faults were hit setting up a fresh mirror from the
+published 1.0.1 image.
+
+### Fixed
+
+- **The compose files could not connect to their own database.** They built a
+  `DATABASE_URL` by string-substituting the password into a URL. A password is
+  arbitrary bytes and a URL is not: `openssl rand -base64 24` — which the
+  documentation told you to use — emits a `/` about 39% of the time, and a `/`
+  ends a URL's authority section, so the password became part of the host and
+  port and the server reported `failed to resolve host 'tns_writer'`. A `@`
+  broke it differently. Both compose files now pass discrete `PGHOST`/`PGUSER`/
+  `PGPASSWORD`/`PGDATABASE` variables, which no character in a password can
+  reinterpret. `DATABASE_URL` is still supported for hand-picked passwords.
+- **`migrate`, `status` and `print-grants` demanded a TNS credential** they never
+  use. Invariant 4 is that the *download* refuses without one, not that every
+  command does — and `print-grants` is how you create the read-only role, so
+  needing a TNS account to print SQL against a local database blocked the
+  documented setup order. Auth is now checked when a source is constructed, so
+  `sync`, `catch-up` and `serve` still fail at startup rather than mid-run.
+
 ## [1.0.1] — 2026-07-26
 
 Release plumbing only — no change to the server, the client, or the schema.
@@ -158,6 +181,7 @@ Several points were under-specified in the design document and resolved here:
 - **Cone search is not in the server.** It belongs to the client; the server only
   owns the `(ra, dec)` index, which is DDL and therefore contract.
 
-[Unreleased]: https://github.com/sarhatabaot/tns-mirror/compare/1.0.1...HEAD
+[Unreleased]: https://github.com/sarhatabaot/tns-mirror/compare/1.0.2...HEAD
+[1.0.2]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.2
 [1.0.1]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.1
 [1.0.0]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.0

@@ -69,7 +69,11 @@ services:
       TNS_BOT_ID: ${TNS_BOT_ID:-}
       TNS_BOT_NAME: ${TNS_BOT_NAME:-}
 
-      DATABASE_URL: postgresql://${POSTGRES_USER:-tns_writer}:${POSTGRES_PASSWORD:-CHANGE-ME}@db:5432/${POSTGRES_DB:-tnsdb}
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-tns_writer}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-CHANGE-ME}
+      PGDATABASE: ${POSTGRES_DB:-tnsdb}
       TNS_THROTTLE: ${TNS_THROTTLE:-10}
       TNS_FULL_CRON: ${TNS_FULL_CRON:-0 0 * * *}
       TNS_DELTA_CRON: ${TNS_DELTA_CRON:-10 * * * *}
@@ -87,6 +91,18 @@ volumes:
   pgdata:
   workdir:
 ```
+
+<div class="callout" data-callout="warning">
+
+**Use the `PG*` variables, not a `DATABASE_URL`, when the password is
+generated.** A password is arbitrary bytes; a URL is not. `openssl rand -base64
+24` emits a `/` about 39% of the time, and a `/` ends a URL's authority section —
+so the password silently becomes part of the host and port and you get
+`failed to resolve host 'tns_writer'`. A `@` breaks it differently. `DATABASE_URL`
+is still supported and is fine for a hand-picked password, but the discrete
+variables cannot be broken by any character.
+
+</div>
 
 The two edits look like this:
 

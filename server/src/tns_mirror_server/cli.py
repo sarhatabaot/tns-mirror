@@ -49,6 +49,14 @@ def _configure_logging(level: str) -> None:
 
 
 def build_source(config: Config) -> Source:
+    """Construct the configured source, refusing early without a credential.
+
+    Only the commands that actually download call this, so ``migrate`` and
+    friends stay usable on a mirror whose TNS credential has not been set yet —
+    while ``sync``, ``catch-up`` and ``serve`` still fail at startup rather than
+    at the first scheduled download hours later.
+    """
+    config.auth.validate()
     return get_source(config.source)(config)
 
 

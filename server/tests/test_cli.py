@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 
 import pytest
@@ -213,3 +214,53 @@ def test_serve_refuses_when_every_schedule_is_empty(monkeypatch, wired, tmp_path
     monkeypatch.setattr(cli, "load_config", lambda _path: config)
 
     assert cli.main(["serve", "--max-iterations", "0"]) == cli.EXIT_ERROR
+
+
+# --- commands that never contact TNS ----------------------------------------
+
+
+def test_local_commands_work_without_a_tns_credential(monkeypatch, tmp_path, capsys):
+    """migrate, status and print-grants must not demand a TNS account.
+
+    print-grants is how an operator creates the read-only role, and needing a
+    TNS marker to print SQL against a local database is a barrier with nothing
+    behind it. This is the flow the quickstart documents, in the order it
+    documents it, before any credential exists.
+    """
+    from contextlib import contextmanager
+
+    store = MemoryStore()
+
+    @contextmanager
+    def fake_store(_config):
+        yield store
+
+    monkeypatch.setattr(cli, "_store", fake_store)
+    monkeypatch.setattr(cli, "load_config", lambda _path: make_config(tmp_path, user_agent=""))
+
+    assert cli.main(["migrate"]) == 0
+    assert cli.main(["status"]) == 0
+    assert cli.main(["print-grants", "--database", "tnsdb"]) == 0
+    assert "GRANT SELECT" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "argv", [["sync"], ["sync", "--hour", "3"], ["catch-up", "2"], ["serve"]]
+)
+def test_download_commands_still_refuse_without_a_credential(
+    monkeypatch, tmp_path, argv, caplog
+):
+    """Invariant 4: authenticated to TNS, or no download. Checked up front."""
+    from contextlib import contextmanager
+
+    @contextmanager
+    def fake_store(_config):
+        yield MemoryStore()
+
+    monkeypatch.setattr(cli, "_store", fake_store)
+    monkeypatch.setattr(cli, "load_config", lambda _path: make_config(tmp_path, user_agent=""))
+
+    with caplog.at_level(logging.ERROR, logger="tns_mirror_server"):
+        assert cli.main(argv) == cli.EXIT_ERROR
+
+    assert "never downloads anonymously" in caplog.text

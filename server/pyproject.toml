@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tns-mirror-server"
-version = "1.0.1"
+version = "1.0.2"
 description = "Mirror the IAU Transient Name Server public objects catalogue into SQL."
 readme = "README.md"
 requires-python = ">=3.13"
