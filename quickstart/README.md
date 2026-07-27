@@ -93,8 +93,20 @@ $ docker compose exec -T db psql -U tns_writer -d tnsdb \
     -v pw="$(openssl rand -base64 24)" -f - < grants.sql
 ```
 
+`-v pw=…` fills the `:'pw'` placeholder, keeping the password out of the file —
+generate it into a variable first (`PW=$(openssl rand -base64 24); echo "$PW"`)
+so you still know what it is. Or skip the indirection entirely; a reader is just:
+
+```sql
+CREATE ROLE tns_ro LOGIN PASSWORD 'your-password';
+GRANT CONNECT ON DATABASE tnsdb TO tns_ro;
+GRANT USAGE ON SCHEMA public TO tns_ro;
+GRANT SELECT ON public.tns_objects TO tns_ro;
+GRANT SELECT ON public.tns_mirror_meta TO tns_ro;
+```
+
 That role can `SELECT` on exactly two tables — the catalogue and its metadata —
-and nothing else. Use the password you generated in your application's DSN:
+and nothing else. Use the password in your application's DSN:
 
 ```
 postgresql://tns_ro:THE-PASSWORD@your-host:5432/tnsdb

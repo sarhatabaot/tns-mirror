@@ -27,6 +27,12 @@ around them.
 `--reuse-existing` (ingest an already-downloaded file without fetching, for
 debugging).
 
+**Only three of these need a TNS credential.** `sync`, `catch-up` and `serve`
+download, so they refuse at startup without one. `migrate`, `status` and
+`print-grants` never contact TNS — you can create the schema, check a row count
+and hand out a read-only role on a mirror that has no credential configured
+yet.
+
 ## Two deployment shapes, one image
 
 Build the image once, deploy it either way.

@@ -25,6 +25,12 @@ secrets stay out of the file and the file itself is safe to commit.
 Exactly one mode is active. With neither configured the download refuses; there
 is no anonymous fallback.
 
+That applies to the commands that *download* — `sync`, `catch-up` and `serve`,
+each of which refuses at startup rather than partway through. `migrate`,
+`status` and `print-grants` never contact TNS and work without a credential, so
+you can create the schema and hand out a read-only role before you have a TNS
+account.
+
 | Setting | Environment | Default |
 |---|---|---|
 | `auth.mode` | `TNS_AUTH_MODE` | `marker` |
@@ -63,9 +69,20 @@ shared with consumers.
 
 | Setting | Environment | Default |
 |---|---|---|
-| `database.dsn` | `DATABASE_URL` | — (falls back to the standard `PG*` variables) |
+| — | `PGHOST` `PGPORT` `PGUSER` `PGPASSWORD` `PGDATABASE` | standard libpq variables |
+| `database.dsn` | `DATABASE_URL` | — |
 | `database.schema` | `TNS_SCHEMA` | `public` |
 | `database.table` | `TNS_TABLE` | `tns_objects` |
+
+**Prefer the `PG*` variables to a URL.** A password is arbitrary bytes; a URL is
+not. `openssl rand -base64 24` emits a `/` about 39% of the time, and a `/` ends
+a URL's authority section — the password silently becomes part of the host and
+port, and you get `failed to resolve host 'tns_writer'`. An `@` breaks it
+differently. `DATABASE_URL` is fully supported and fine for a hand-picked
+password; the discrete variables cannot be broken by any character.
+
+Set neither and libpq falls back to its own defaults, which is rarely what you
+want — the shipped compose files set `PG*` explicitly.
 
 `schema` and `table` must be plain lowercase identifiers. They reach DDL, so they
 are validated at load and composed through psycopg's identifier quoting at use.
@@ -110,7 +127,8 @@ download:
   workdir: /var/lib/tns-mirror
 
 database:
-  dsn: ${DATABASE_URL}
+  # Connection settings come from the environment — PGHOST/PGUSER/PGPASSWORD/
+  # PGDATABASE, or DATABASE_URL. Only the placement is configured here.
   schema: public
   table: tns_objects
 

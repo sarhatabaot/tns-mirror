@@ -150,7 +150,10 @@ catch-up daily to repair anything missed while it was down.
 
 ## 5. Create a reader for your application
 
-Your application does **not** get the server's write credentials:
+Your application does **not** get the server's write credentials. A reader is
+five SQL statements, and `print-grants` writes them out with your schema and
+table names filled in — it only prints, it connects to nothing, and it needs no
+TNS credential:
 
 ```console
 $ docker compose exec server tns-mirror-server print-grants --database tnsdb > grants.sql
@@ -158,11 +161,29 @@ $ docker compose exec -T db psql -U tns_writer -d tnsdb \
     -v pw="$(openssl rand -base64 24)" -f - < grants.sql
 ```
 
+`-v pw=…` fills in the `:'pw'` placeholder in the generated SQL, which keeps the
+password out of the file. Generate it into a variable first so you still know
+what it is:
+
+```console
+$ PW=$(openssl rand -base64 24); echo "$PW"
+```
+
+If you would rather skip the indirection, the whole thing is just:
+
+```sql
+CREATE ROLE tns_ro LOGIN PASSWORD 'your-password';
+GRANT CONNECT ON DATABASE tnsdb TO tns_ro;
+GRANT USAGE ON SCHEMA public TO tns_ro;
+GRANT SELECT ON public.tns_objects TO tns_ro;
+GRANT SELECT ON public.tns_mirror_meta TO tns_ro;
+```
+
 That role can `SELECT` on exactly two tables — the catalogue and its metadata —
-and nothing else. Use the password you generated:
+and nothing else. Hand out:
 
 ```text
-postgresql://tns_ro:THE-PASSWORD@your-host:5432/tnsdb
+postgresql://tns_ro:your-password@your-host:5432/tnsdb
 ```
 
 ## 6. Query it
@@ -213,7 +234,7 @@ download:
   workdir: /var/lib/tns-mirror
 
 database:
-  dsn: ${DATABASE_URL}
+  # Connection settings come from the environment (PG* or DATABASE_URL).
   schema: public
   table: tns_objects
 

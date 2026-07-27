@@ -37,10 +37,14 @@ download:
   workdir: /var/lib/tns-mirror
 
 database:
-  # Write credentials for the mirror's own database. Consumers never get these;
-  # they get a separate read-only role. Generate it with:
+  # Connection settings come from the environment — PGHOST/PGUSER/PGPASSWORD/
+  # PGDATABASE (what the compose files set), or DATABASE_URL. Prefer the former:
+  # a generated password often contains '/' or '@', and both change how a URL
+  # parses. Only the placement of the tables is configured here.
+  #
+  # These are *write* credentials. Consumers never get them; they get a separate
+  # read-only role, generated with:
   #   docker compose exec server tns-mirror-server print-grants --database tnsdb
-  dsn: ${DATABASE_URL}
   schema: public
   table: tns_objects
 
