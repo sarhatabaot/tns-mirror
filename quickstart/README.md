@@ -88,14 +88,18 @@ Your application does **not** get the server's write credentials. Generate a
 least-privilege role instead:
 
 ```console
+$ PW=$(openssl rand -base64 24)          # generate it, and keep it
+$ echo "$PW"                             # this is the reader's password
+
 $ docker compose exec server tns-mirror-server print-grants --database tnsdb > grants.sql
 $ docker compose exec -T db psql -U tns_writer -d tnsdb \
-    -v pw="$(openssl rand -base64 24)" -f - < grants.sql
+    -v pw="$PW" -f - < grants.sql
 ```
 
-`-v pw=…` fills the `:'pw'` placeholder, keeping the password out of the file —
-generate it into a variable first (`PW=$(openssl rand -base64 24); echo "$PW"`)
-so you still know what it is. Or skip the indirection entirely; a reader is just:
+`print-grants` writes `:'pw'` where the password goes and `-v pw=…` fills it in,
+so the password reaches Postgres without being written to `grants.sql`. That is
+the only reason for the indirection — skip it and type the password directly if
+you prefer. A reader is just five statements:
 
 ```sql
 CREATE ROLE tns_ro LOGIN PASSWORD 'your-password';
@@ -132,6 +136,19 @@ Any language with a Postgres driver works too — see
 [the data contract](../schema/README.md).
 
 ---
+
+## Just the minimum
+
+[`docker-compose.minimal.yml`](docker-compose.minimal.yml) is the same setup with
+nothing optional in it, using a **TNS bot**. Replace the four `CHANGE-ME` values
+and run:
+
+```console
+$ docker compose -f docker-compose.minimal.yml up -d
+```
+
+Bot mode needs all three of `TNS_API_KEY`, `TNS_BOT_ID` and `TNS_BOT_NAME` — the
+key authenticates the request, the id and name identify which bot is asking.
 
 ## Optional: a YAML config file
 

@@ -1,0 +1,56 @@
+# tns-mirror — the smallest thing that works, using a TNS bot.
+#
+# Put the values in a .env beside this file, or edit the defaults inline —
+# both work, and .env wins:
+#
+#   docker compose -f docker-compose.minimal.yml up -d
+#
+# There is nothing optional in this file. Every line is either required or the
+# default; docker-compose.yml is the same thing with the settings you may want
+# to change made visible and explained.
+#
+# Bot credentials come from Bot Management in your TNS profile
+# (https://www.wis-tns.org/). All three are required: the api_key
+# authenticates the request, the id and name identify which bot is asking.
+
+name: tns-mirror
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tnsdb}
+      POSTGRES_USER: ${POSTGRES_USER:-tns_writer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE-ME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Not decoration: the server does not retry a database that is not up yet,
+    # so `depends_on` below needs something to wait for.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tns_writer} -d ${POSTGRES_DB:-tnsdb}"]
+      interval: 5s
+      retries: 20
+
+  server:
+    image: sarhatabaot/tns-mirror-server:1.0.2
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TNS_AUTH_MODE: ${TNS_AUTH_MODE:-bot}
+      TNS_API_KEY: ${TNS_API_KEY:-}
+      TNS_BOT_ID: ${TNS_BOT_ID:-}
+      TNS_BOT_NAME: ${TNS_BOT_NAME:-}
+
+      # Discrete variables rather than a URL: a generated password often
+      # contains '/' or '@', and both change how a URL parses.
+      PGHOST: db
+      PGUSER: ${PGUSER:-${POSTGRES_USER:-tns_writer}}
+      PGPASSWORD: ${PGPASSWORD:-${POSTGRES_PASSWORD:-CHANGE-ME}}
+      PGDATABASE: ${PGDATABASE:-${POSTGRES_DB:-tnsdb}}
+    volumes:
+      - workdir:/var/lib/tns-mirror
+
+volumes:
+  pgdata:
+  workdir:
