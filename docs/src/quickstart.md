@@ -156,20 +156,20 @@ table names filled in — it only prints, it connects to nothing, and it needs n
 TNS credential:
 
 ```console
+$ PW=$(openssl rand -base64 24)          # generate it, and keep it
+$ echo "$PW"                             # this is the reader's password
+
 $ docker compose exec server tns-mirror-server print-grants --database tnsdb > grants.sql
 $ docker compose exec -T db psql -U tns_writer -d tnsdb \
-    -v pw="$(openssl rand -base64 24)" -f - < grants.sql
+    -v pw="$PW" -f - < grants.sql
 ```
 
-`-v pw=…` fills in the `:'pw'` placeholder in the generated SQL, which keeps the
-password out of the file. Generate it into a variable first so you still know
-what it is:
+`print-grants` writes `:'pw'` where the password goes, and `-v pw=…` fills it
+in — so the password reaches Postgres without ever being written to
+`grants.sql`. That is the only reason for the indirection.
 
-```console
-$ PW=$(openssl rand -base64 24); echo "$PW"
-```
-
-If you would rather skip the indirection, the whole thing is just:
+If you do not want it, skip `print-grants` entirely. A reader is five
+statements, and you can type the password directly:
 
 ```sql
 CREATE ROLE tns_ro LOGIN PASSWORD 'your-password';
@@ -204,6 +204,63 @@ with TnsMirror(dsn=os.environ["TNS_RO_DSN"]) as tns:
 
 See [the client]({{ '/client/' | url }}) for the full API, or
 [the contract]({{ '/contract/' | url }}) to query from any other language.
+
+## Just give me the smallest thing that works
+
+[`docker-compose.minimal.yml`]({{ site.repository }}/blob/main/quickstart/docker-compose.minimal.yml)
+is the same setup with nothing optional in it, using a **TNS bot**. Replace the
+four `CHANGE-ME` values and run it:
+
+```yaml
+name: tns-mirror
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tnsdb
+      POSTGRES_USER: tns_writer
+      POSTGRES_PASSWORD: CHANGE-ME
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tns_writer -d tnsdb"]
+      interval: 5s
+      retries: 20
+
+  server:
+    image: sarhatabaot/tns-mirror-server:1.0.2
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TNS_AUTH_MODE: bot
+      TNS_API_KEY: CHANGE-ME
+      TNS_BOT_ID: CHANGE-ME
+      TNS_BOT_NAME: CHANGE-ME
+      PGHOST: db
+      PGUSER: tns_writer
+      PGPASSWORD: CHANGE-ME
+      PGDATABASE: tnsdb
+    volumes:
+      - workdir:/var/lib/tns-mirror
+
+volumes:
+  pgdata:
+  workdir:
+```
+
+```console
+$ docker compose -f docker-compose.minimal.yml up -d
+```
+
+**Bot mode needs all three values.** The `api_key` authenticates the request;
+the id and name say which bot is asking. Supply only the key and the server
+refuses, naming what is missing. All three come from *Bot Management* in your
+TNS profile.
+
+The healthcheck is not decoration: the server does not retry a database that is
+not up yet, so `depends_on` needs something to wait on.
 
 ## Prefer a `.env` file?
 

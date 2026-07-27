@@ -1,0 +1,65 @@
+<script>
+  (function () {
+    // Clipboard access needs a secure context. On plain http (other than
+    // localhost) there is no clipboard to write to, so add nothing rather than
+    // a button that silently fails.
+    if (!navigator.clipboard) return;
+
+    var COPY = "Copy";
+    var DONE = "Copied";
+    var FAILED = "Press ⌘/Ctrl+C";
+
+    // A console block interleaves commands with their output. Copying the lot
+    // and pasting it runs the output as commands, so when a block has prompts,
+    // take only the prompted lines and drop the prompt itself.
+    function textToCopy(pre) {
+      var raw = pre.querySelector("code").innerText.replace(/\n$/, "");
+      var lines = raw.split("\n");
+      var prompted = lines.filter(function (line) {
+        return /^\s*\$\s/.test(line);
+      });
+      if (prompted.length === 0) return raw;
+      return prompted
+        .map(function (line) {
+          return line.replace(/^\s*\$\s/, "");
+        })
+        .join("\n");
+    }
+
+    document.querySelectorAll(".prose pre").forEach(function (pre) {
+      if (!pre.querySelector("code")) return;
+
+      var wrapper = document.createElement("div");
+      wrapper.className = "code-block";
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "copy-button";
+      button.textContent = COPY;
+      // The visible label is short; screen readers get the whole story.
+      button.setAttribute("aria-label", "Copy code to clipboard");
+      wrapper.appendChild(button);
+
+      var reset;
+      button.addEventListener("click", function () {
+        navigator.clipboard.writeText(textToCopy(pre)).then(
+          function () {
+            button.textContent = DONE;
+            button.dataset.state = "done";
+          },
+          function () {
+            button.textContent = FAILED;
+            button.dataset.state = "failed";
+          },
+        );
+        clearTimeout(reset);
+        reset = setTimeout(function () {
+          button.textContent = COPY;
+          delete button.dataset.state;
+        }, 2000);
+      });
+    });
+  })();
+</script>

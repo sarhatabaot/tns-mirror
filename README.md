@@ -59,9 +59,12 @@ last_source_snapshot: 2026-07-26
 Then create a reader for your application:
 
 ```console
+$ PW=$(openssl rand -base64 24)          # generate it, and keep it
+$ echo "$PW"                             # this is the reader's password
+
 $ docker compose exec server tns-mirror-server print-grants --database tnsdb > grants.sql
 $ docker compose exec -T db psql -U tns_writer -d tnsdb \
-    -v pw="$(openssl rand -base64 24)" -f - < grants.sql
+    -v pw="$PW" -f - < grants.sql
 ```
 
 ## Querying it

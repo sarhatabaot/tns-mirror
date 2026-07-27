@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
 
     <link rel="stylesheet" href="{{ '/assets/style.css' | url }}" />
-    <link rel="stylesheet" href="{{ '/pagefind/pagefind-ui.css' | url }}" />
+    <link rel="stylesheet" href="{{ '/pagefind/pagefind-component-ui.css' | url }}" />
     <link
       rel="icon"
       href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><text y=%2213%22 font-size=%2213%22>🔭</text></svg>"
@@ -118,20 +118,13 @@
       })();
     </script>
 
-    <script src="{{ '/pagefind/pagefind-ui.js' | url }}" onerror="this.dataset.failed=1"></script>
-    <script>
-      window.addEventListener("DOMContentLoaded", function () {
-        // Absent during a bare `eleventy --serve` before the index is built.
-        if (typeof PagefindUI === "undefined") return;
-        new PagefindUI({
-          element: "#search",
-          bundlePath: "{{ '/pagefind/' | url }}",
-          showSubResults: true,
-          showImages: false,
-          resetStyles: false,
-          translations: { placeholder: "Search docs" },
-        });
-      });
-    </script>
+    {% include "partials/copy-button.liquid" %}
+
+    {% comment %}
+      The components register themselves, so there is nothing to construct. If
+      the index has not been built yet — a bare `eleventy --serve` — the custom
+      elements stay unupgraded and render as an empty box rather than erroring.
+    {% endcomment %}
+    <script type="module" src="{{ '/pagefind/pagefind-component-ui.js' | url }}"></script>
   </body>
 </html>

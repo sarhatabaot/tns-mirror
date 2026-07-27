@@ -1,7 +1,21 @@
 {% comment %}
-  Pagefind builds a static index from the rendered HTML at build time, so search
-  works with no server and no third-party service — the site stays a pile of
-  files. The UI mounts itself into #search once its script loads; if it has not
-  been indexed yet (a bare `eleventy --serve`), nothing renders here.
+  Pagefind's Component UI. Pagefind builds a static index from the rendered HTML
+  at build time, so search works with no server and no third-party service — the
+  site stays a pile of files.
+
+  This replaced the Default UI, which Pagefind now flags as legacy for new
+  integrations. The searchbox is a self-contained custom element: input,
+  dropdown, results, arrow-key navigation, and a mod+k shortcut, with the ARIA
+  combobox roles handled for us rather than by hand.
+
+  bundle-path matters because GitHub Pages serves this under /tns-mirror/; with
+  the default the components would look for the index at the domain root.
 {% endcomment %}
-<div id="search" class="search" data-pagefind-ignore></div>
+<pagefind-config bundle-path="{{ '/pagefind/' | url }}"></pagefind-config>
+
+<pagefind-searchbox
+  class="search"
+  placeholder="Search docs"
+  show-sub-results
+  max-results="12"
+></pagefind-searchbox>

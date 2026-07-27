@@ -35,6 +35,25 @@ published 1.0.1 image.
 
 ### Added
 
+- **`quickstart/docker-compose.minimal.yml`** — the same setup with nothing
+  optional in it, using a TNS bot. Four values to replace.
+- **TNS's rejections are now readable.** A wrong marker or a mistyped bot key is
+  the commonest real failure, and it surfaced as an unhandled traceback ending
+  in `401 Client Error`, which says nothing about what to change. A 401 or 403
+  now names the settings to check for the mode in use, and a 404 distinguishes
+  an hour TNS has not staged yet from a wrong `TNS_URL`. A 429 is deliberately
+  left untranslated — the engine needs the original error to stop a catch-up
+  early. Network failures no longer produce a traceback either.
+- **Search uses Pagefind's Component UI**, which Pagefind recommends over the
+  Default UI for new integrations — a self-contained custom element with arrow
+  key navigation, a `mod+k` shortcut and the ARIA combobox roles handled for us.
+  Its stylesheet has no `prefers-color-scheme` rules, so its hard-coded light
+  defaults rendered white-on-white in dark mode; it is now themed by mapping its
+  `--pf-*` properties onto the site's tokens, taking dropdown text from a 1.0:1
+  contrast ratio to 11.8:1.
+- **A copy button on every code block** in the documentation. Blocks with shell
+  prompts copy only the commands, without the `$` and without the example
+  output, since pasting the output back would run it.
 - **A pre-release smoke test** (`scripts/smoke_test.sh`). Everything else in CI
   tests the source; this drives the *built image* with the compose file we
   publish, against a real Postgres, in the order the documentation prescribes.

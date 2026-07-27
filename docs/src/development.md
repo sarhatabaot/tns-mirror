@@ -144,10 +144,15 @@ so the navigation says which half is theirs rather than making them work it out.
 the default signal; an explicit choice is stored in `localStorage` and applied
 before first paint, so navigating never flashes the wrong theme.
 
-**Search** is [Pagefind](https://pagefind.app/), which indexes the built HTML
-after Eleventy runs. The index is static files, so search needs no server and no
-third-party service. `npm run build` does both steps; `npm run dev` builds once
-first so search works locally.
+**Search** is [Pagefind](https://pagefind.app/)'s Component UI, which indexes the
+built HTML after Eleventy runs. The index is static files, so search needs no
+server and no third-party service. `npm run build` does both steps; `npm run dev`
+builds once first so search works locally.
+
+Pagefind's stylesheet carries no `prefers-color-scheme` rules — its defaults are
+hard-coded light, so left alone it renders white-on-white for a dark-mode
+reader. It is themed by mapping its `--pf-*` custom properties onto our tokens
+in one place, which means both themes and the explicit toggle follow for free.
 
 **Code highlighting** is Prism, run at build time by
 `@11ty/eleventy-plugin-syntaxhighlight`. The markup is baked into the HTML, so no

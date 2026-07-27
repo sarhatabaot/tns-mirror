@@ -89,48 +89,62 @@
 
 /* --- search -------------------------------------------------------------- */
 
+/*
+ * Pagefind's Component UI is themed through its own custom properties, and its
+ * stylesheet has no prefers-color-scheme rules at all — the defaults are
+ * hard-coded light. Left alone it renders white-on-white for a dark-mode
+ * reader. Mapping its variables onto ours is the whole integration: our tokens
+ * already switch with the theme, so this follows for free, in both directions,
+ * including the explicit toggle.
+ */
+.search,
+pagefind-modal {
+  --pf-text: var(--color-text);
+  --pf-text-secondary: var(--color-text-muted);
+  --pf-text-muted: var(--color-text-muted);
+  --pf-background: var(--color-surface-raised);
+  --pf-border: var(--color-rule);
+  --pf-border-focus: var(--color-accent);
+  --pf-hover: var(--color-surface);
+  --pf-mark: var(--color-accent);
+  --pf-skeleton: var(--color-surface);
+  --pf-skeleton-shine: var(--color-surface-raised);
+  --pf-scroll-shadow: var(--color-shadow);
+
+  --pf-shadow-sm: 0 2px 8px var(--color-shadow);
+  --pf-shadow-md: 0 4px 12px var(--color-shadow);
+  --pf-shadow-lg: 0 16px 48px var(--color-shadow);
+
+  --pf-font: var(--font-base);
+  --pf-border-radius: var(--radius);
+  --pf-input-font-size: var(--size-step--1);
+  --pf-result-title-font-size: var(--size-step--1);
+  --pf-result-excerpt-font-size: 0.8rem;
+
+  --pf-outline-focus: var(--color-accent);
+
+  /* Above the sticky masthead, which sets z-index 5. */
+  --pf-dropdown-z-index: 20;
+}
+
 .search {
-  inline-size: min(16rem, 40vw);
+  display: block;
+  inline-size: min(18rem, 45vw);
+  --pf-searchbox-max-width: none;
 }
 
-/* Pagefind ships its own stylesheet; these align it with the site's tokens
-   rather than restyling it wholesale. */
-.search .pagefind-ui__search-input {
-  background: var(--color-bg);
-  border: var(--border);
-  border-radius: var(--radius);
-  color: var(--color-text);
-  font-family: var(--font-base);
-  font-size: var(--size-step--1);
-  padding: var(--space-2xs) var(--space-xs);
-  inline-size: 100%;
-}
-
-.search .pagefind-ui__drawer {
-  background: var(--color-surface-raised);
-  border: var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8px 24px var(--color-shadow);
-  inline-size: min(28rem, 90vw);
+/* The dropdown is wider than the input it hangs from — result titles and
+   excerpts need the room more than the collapsed box does. */
+.search .pf-searchbox-dropdown {
+  inline-size: min(30rem, 90vw);
   inset-inline-end: 0;
-  max-block-size: 70vh;
-  overflow-y: auto;
-  padding: var(--space-xs);
-  position: absolute;
-  z-index: 20;
 }
 
-.search .pagefind-ui__result-link {
-  color: var(--color-accent);
+.search .pf-searchbox-result-title {
+  font-weight: 600;
 }
 
-.search .pagefind-ui__result-excerpt,
-.search .pagefind-ui__message {
-  color: var(--color-text-muted);
-  font-size: var(--size-step--1);
-}
-
-.search .pagefind-ui__result mark {
+.search mark {
   background: var(--color-accent-bg);
   color: inherit;
 }
@@ -328,4 +342,49 @@
 
 .site-footer__inner p {
   margin: 0;
+}
+
+/* --- code blocks --------------------------------------------------------- */
+
+/* The button is positioned against this wrapper, which the script inserts
+   around each pre. Doing it in the DOM rather than in every template keeps the
+   markdown free of presentation. */
+.code-block {
+  position: relative;
+}
+
+.copy-button {
+  background: var(--color-bg);
+  border: var(--border);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  inset-block-start: var(--space-2xs);
+  inset-inline-end: var(--space-2xs);
+  line-height: 1;
+  padding: var(--space-2xs) var(--space-xs);
+  position: absolute;
+  /* Hidden until the block is hovered or the button is focused, so it does not
+     sit on top of the first line of every example. Always reachable by keyboard
+     because :focus-visible brings it back. */
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+}
+
+.code-block:hover .copy-button,
+.copy-button:focus-visible {
+  opacity: 1;
+}
+
+.copy-button:hover {
+  color: var(--color-accent);
+}
+
+/* Touch devices have no hover; showing it permanently is the only way it can
+   be used at all. */
+@media (hover: none) {
+  .copy-button {
+    opacity: 1;
+  }
 }

@@ -68,3 +68,17 @@
 .toc--empty {
   display: none;
 }
+
+/* Copy feedback. Driven by a data attribute the script sets, so the styling
+   and the state cannot drift apart. */
+.copy-button[data-state="done"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  opacity: 1;
+}
+
+.copy-button[data-state="failed"] {
+  border-color: var(--color-warn-rule);
+  color: var(--color-warn-rule);
+  opacity: 1;
+}
