@@ -33,6 +33,25 @@ published 1.0.1 image.
   documented setup order. Auth is now checked when a source is constructed, so
   `sync`, `catch-up` and `serve` still fail at startup rather than mid-run.
 
+### Added
+
+- **A pre-release smoke test** (`scripts/smoke_test.sh`). Everything else in CI
+  tests the source; this drives the *built image* with the compose file we
+  publish, against a real Postgres, in the order the documentation prescribes.
+  Both faults above passed every source-level test and reached users.
+
+  Two choices in it are load-bearing. The password contains `/`, `@`, `+` and
+  `=` — with the shipped `CHANGE-ME` default the URL fault does not reproduce,
+  so a smoke test using a well-behaved password would have passed while the
+  release was broken. And no TNS credential is configured, because the local
+  commands must work without one *and* the downloading commands must refuse.
+
+  It gates every image build and, in the release workflow, sits between
+  verification and publishing: `verify → smoke → publish`. Run it locally with
+  `uvx pre-commit run smoke-test --hook-stage manual`.
+
+  Verified by reverting each fault in turn and confirming it fails.
+
 ## [1.0.1] — 2026-07-26
 
 Release plumbing only — no change to the server, the client, or the schema.

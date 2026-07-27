@@ -57,10 +57,19 @@ jobs:
           exit-code: "1"
 
       # A published image that cannot start is worse than no image.
-      - name: Smoke test
+      - name: Starts, and as non-root
         run: |
           set -euo pipefail
           docker run --rm tns-mirror-server:ci --version
           docker run --rm tns-mirror-server:ci --help > /dev/null
           test "$(docker run --rm --entrypoint id tns-mirror-server:ci -u)" = "10001"
           echo "image runs, and runs as non-root"
+
+      # Everything else in CI tests the source. This drives the *artifact* with
+      # the compose file we publish, against a real Postgres, following the
+      # documented setup — which is where the 1.0.1 faults lived, invisible to
+      # every source-level test.
+      - name: End-to-end smoke test
+        run: |
+          docker tag tns-mirror-server:ci sarhatabaot/tns-mirror-server:smoke
+          scripts/smoke_test.sh smoke

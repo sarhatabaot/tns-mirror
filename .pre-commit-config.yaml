@@ -159,3 +159,15 @@ repos:
         pass_filenames: false
         files: ^docs/
         stages: [pre-push, manual]
+
+      # Builds the image and drives the published compose file against a real
+      # Postgres. Slower than everything else here, and worth it: this is the
+      # only check that exercises what a user actually receives. Manual only —
+      # a couple of minutes is too long for a push hook, but it is exactly what
+      # you want to run before cutting a release.
+      - id: smoke-test
+        name: end-to-end smoke test of the image
+        entry: scripts/smoke_test_local.sh
+        language: script
+        pass_filenames: false
+        stages: [manual]
