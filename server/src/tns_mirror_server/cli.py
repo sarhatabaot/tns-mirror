@@ -23,6 +23,8 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 
+import requests
+
 from . import __version__
 from .adapters import PostgresStore
 from .config import Config, load_config
@@ -313,6 +315,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Deliberate failures print a single actionable line; a traceback here
         # would be noise, and could carry a DSN into the logs.
         log.error("%s", exc)
+        return EXIT_ERROR
+    except requests.RequestException as exc:
+        # Anything left from the network layer — a timeout, a DNS failure, a
+        # 5xx from TNS. Not our bug and not the operator's, but a traceback
+        # helps neither of them work out which.
+        log.error("could not reach TNS: %s", exc)
         return EXIT_ERROR
     except KeyboardInterrupt:  # pragma: no cover
         log.info("interrupted")

@@ -12,7 +12,7 @@ import pytest
 
 from conftest import FakeResponse, FakeSession, make_config, zip_bytes
 from tns_mirror_server.adapters.source_tns import TnsPublicObjects
-from tns_mirror_server.errors import AuthNotConfigured, ConfigError
+from tns_mirror_server.errors import AuthNotConfigured, ConfigError, SourceError
 
 MARKER = 'tns_marker{"tns_id":"1234","type":"user","name":"tester"}'
 
@@ -76,4 +76,49 @@ def test_unknown_auth_mode_is_rejected(tmp_path):
     source = TnsPublicObjects(make_config(tmp_path, mode="anonymous"), session=FakeSession([]))
 
     with pytest.raises(ConfigError, match="must be 'marker' or 'bot'"):
+        source.download()
+
+
+# --- what TNS says when it rejects you --------------------------------------
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_a_rejected_marker_says_what_to_check(tmp_path, status):
+    # The commonest real failure: a marker for an account that was never
+    # registered. "401 Client Error" says nothing about what to change.
+    session = FakeSession(FakeResponse(b"", status=status))
+    source = TnsPublicObjects(make_config(tmp_path, user_agent=MARKER), session=session)
+
+    with pytest.raises(SourceError, match="TNS_USER_AGENT"):
+        source.download()
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_a_rejected_bot_credential_names_all_three_settings(tmp_path, status):
+    config = make_config(
+        tmp_path, mode="bot", user_agent="", api_key="k", bot_id="1", bot_name="b"
+    )
+    session = FakeSession(FakeResponse(b"", status=status))
+
+    with pytest.raises(SourceError, match="TNS_API_KEY"):
+        TnsPublicObjects(config, session=session).download()
+
+
+def test_a_404_distinguishes_an_unstaged_hour_from_a_bad_url(tmp_path):
+    session = FakeSession(FakeResponse(b"", status=404))
+    source = TnsPublicObjects(make_config(tmp_path, user_agent=MARKER), session=session)
+
+    with pytest.raises(SourceError, match="TNS_URL"):
+        source.download()
+
+
+def test_429_stays_an_httperror_for_the_engine_to_classify(tmp_path):
+    # The engine stops a catch-up early on 429 and can only do that if the
+    # original exception reaches it untranslated.
+    import requests
+
+    session = FakeSession(FakeResponse(b"", status=429))
+    source = TnsPublicObjects(make_config(tmp_path, user_agent=MARKER), session=session)
+
+    with pytest.raises(requests.HTTPError):
         source.download()

@@ -82,10 +82,14 @@ class FakeResponse:
         *,
         explode_after: int | None = None,
         parts: int = 4,
+        url: str = TNS_URL,
     ):
         self.body = body
         self.status_code = status
         self.parts = max(1, parts)
+        # The real Response carries the URL it came from, and error messages
+        # quote it. A fake without it hides that from the tests.
+        self.url = url
         self._explode_after = explode_after
 
     def __enter__(self) -> FakeResponse:

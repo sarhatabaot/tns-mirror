@@ -174,7 +174,7 @@ class TnsPublicObjects:
                 stream=True,
                 timeout=self._config.download.timeout_seconds,
             ) as response:
-                response.raise_for_status()
+                self._raise_for_status(response)
                 with tmp_zip.open("wb") as out:
                     for chunk in response.iter_content(chunk_size=_CHUNK):
                         if chunk:
@@ -186,6 +186,45 @@ class TnsPublicObjects:
 
         self._extract(zip_path, csv_path)
         return csv_path
+
+    def _raise_for_status(self, response: requests.Response) -> None:
+        """Turn TNS's rejections into something an operator can act on.
+
+        A rejected credential is the commonest failure by far — a marker for an
+        account that was never registered, a mistyped api_key, a bot id that
+        does not match the key. Left alone, ``raise_for_status`` surfaces that
+        as an unhandled traceback ending in "401 Client Error", which says
+        nothing about what to change.
+
+        429 is deliberately *not* translated: the engine distinguishes it from
+        other failures to stop a catch-up early, and it can only do that if the
+        original ``HTTPError`` reaches it.
+        """
+        if response.status_code in (401, 403):
+            mode = self._config.auth.mode
+            if mode == "bot":
+                detail = (
+                    "TNS rejected the bot credentials. Check TNS_API_KEY, "
+                    "TNS_BOT_ID and TNS_BOT_NAME against Bot Management in your "
+                    "TNS profile — the id and name must belong to the same bot "
+                    "as the key."
+                )
+            else:
+                detail = (
+                    "TNS rejected the marker. Check TNS_USER_AGENT is the "
+                    "tns_marker for a registered account, copied whole, "
+                    "including the surrounding braces."
+                )
+            raise SourceError(f"HTTP {response.status_code} from TNS. {detail}")
+
+        if response.status_code == 404:
+            raise SourceError(
+                f"HTTP 404 from TNS for {response.url}. The hourly delta for an "
+                f"hour TNS has not staged yet returns 404; if the full snapshot "
+                f"404s, check TNS_URL."
+            )
+
+        response.raise_for_status()
 
     @staticmethod
     def _extract(zip_path: Path, csv_path: Path) -> None:
