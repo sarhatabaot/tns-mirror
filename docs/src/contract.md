@@ -4,7 +4,7 @@ title: The data contract
 summary: The schema is the interface. It is the only thing the server and its consumers share.
 permalink: /contract/
 section: client
-order: 2
+order: 4
 tags: docs
 ---
 

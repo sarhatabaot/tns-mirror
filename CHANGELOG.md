@@ -10,6 +10,46 @@ schema change bumps the major on both.
 
 ## [Unreleased]
 
+## [Unreleased]
+
+### Added — `tns-mirror-api` (Docker Hub, optional)
+
+An optional read-only HTTP service in front of a mirror, for consumers who
+cannot reach Postgres — a browser, another language, a network where only HTTP
+crosses the boundary. Litestar on granian.
+
+- **A transport, not a second implementation.** Every query goes through
+  `tns-mirror-client`, so the cone-search geometry exists once in the project
+  rather than once per consumer. A test asserts a search across the 0/360 seam
+  works through HTTP, and it passes purely because the client handles it.
+- **A separate image on purpose.** The sync server holds write credentials and
+  is not exposed; this holds the read-only role, so an exploit here reaches
+  something that can `SELECT` two tables. It sets its session read-only as well,
+  so a bug cannot write even through an over-privileged role.
+- `GET /v1/nearest`, `/v1/cone`, `/v1/objects/{name}`, `/v1/objid/{objid}`,
+  `/v1/meta`, plus `/healthz`, `/readyz` and browsable OpenAPI at `/docs`.
+- **Per-caller rate limiting**, generous by default, with `RateLimit-*` headers.
+  `TNS_API_TRUST_PROXY` is off by default: with it on and no proxy in front, any
+  caller can spoof `X-Forwarded-For` and mint a fresh bucket per request.
+- **`TNS_API_ROOT_PATH`** mounts every route under a prefix for running behind a
+  reverse proxy. The OpenAPI `servers` entry and the container healthcheck follow
+  it, so `/docs` "try it" works and a mounted container does not report unhealthy
+  while serving correctly.
+- **Radius and limit are clamped, not rejected** — rate limiting alone does not
+  stop one enormous query, and an error the caller must handle is worse than the
+  largest answer the service will give.
+- `/readyz` returns 503 when the mirror is stale; `/healthz` does not touch the
+  database. Restarting does not fix a stale mirror, so liveness must not depend
+  on it.
+- `scripts/api_demo.sh` brings the whole thing up against a throwaway seeded
+  database for looking at the OpenAPI page — no TNS credential, no real mirror.
+
+Two faults were caught before it ever ran anywhere: the connection pool ran its
+`SET SESSION CHARACTERISTICS` on a non-autocommit connection, leaving every
+connection `INTRANS` so the pool discarded them and the service would never have
+started; and the route parameters used a Litestar style deprecated in 2.24 and
+removed in 3, surfaced only because warnings are errors in the test suite.
+
 ## [1.0.2] — 2026-07-27
 
 Bug-fix release. Both faults were hit setting up a fresh mirror from the

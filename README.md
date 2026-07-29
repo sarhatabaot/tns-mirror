@@ -19,12 +19,19 @@ TNS **offline**, without putting a rate-limited public API on your hot path.
 | **[`tns-mirror-server`](server/)** | Docker image (`sarhatabaot/tns-mirror-server`) | v1.0 |
 | **[`schema/`](schema/)** | the published SQL contract | v1 |
 | **[`tns-mirror-client`](client/)** | PyPI package | v1.0 |
+| **[`tns-mirror-api`](api/)** | Docker image (`sarhatabaot/tns-mirror-api`) — optional | v1.0 |
 
 The **server** downloads and writes. It does not query on anyone's behalf: no
 cone search, no cross-matching. Consumers read the database through a read-only
 role, and the **schema is the contract** between them. The **client** is an
 ergonomic, typed wrapper over that same contract — never a privileged path, and
 sharing no code with the server.
+
+The **API** is optional, and only worth adding when a consumer cannot reach
+Postgres — a browser, another language, a network where only HTTP crosses the
+boundary. It is a transport in front of the client rather than a second
+implementation, and it runs as its own container holding the read-only role, so
+the sync server's write credentials stay unexposed.
 
 ## Quick start
 
@@ -184,6 +191,34 @@ download refuses** rather than falling back to an anonymous request.
   secret push-protection. Every suppression carries a justification *and* an
   expiry, and [the expiry is enforced by CI](scripts/check_waivers.py).
 
+## Optional: an HTTP API
+
+If your consumers speak Python and can reach the database, the client is simpler
+and one hop shorter. If they cannot, add the API alongside the mirror using the
+read-only role you created above:
+
+```console
+$ cd quickstart
+$ docker compose -f docker-compose.yml -f docker-compose.api.yml up -d
+```
+
+```console
+$ curl 'http://127.0.0.1:8000/v1/nearest?ra=203.1&dec=10.2&radius_arcsec=3'
+```
+
+Browsable OpenAPI at `/docs`. Per-caller rate limiting, a configurable path
+prefix for running behind a reverse proxy, and query caps that clamp rather than
+reject. See [`api/`](api/).
+
+To look at it without setting up a mirror at all — no TNS credential, no sync:
+
+```console
+$ ./scripts/api_demo.sh
+```
+
+That brings up a throwaway seeded database and serves the API against it, then
+tears everything down on Ctrl-C.
+
 ## Documentation
 
 Full documentation lives in [`docs/`](docs/) and builds with
@@ -213,12 +248,16 @@ engine depends only on a `Source` and a `Store` protocol, both of which have
 in-memory fakes, so the whole engine — atomic replace, idempotent deltas,
 catch-up ordering, rate-limit backoff — is tested without touching anything real.
 
-The client is a separate package with its own lockfile:
+The API and the client are separate packages with their own lockfiles:
 
 ```console
 $ cd client
 $ uv sync --all-groups
 $ uv run pytest                      # unit + the schema/client contract test
+$ TNS_TEST_DSN=postgresql://postgres:pg@localhost:55432/postgres uv run pytest -m integration
+
+$ cd ../api
+$ uv sync --all-groups
 $ TNS_TEST_DSN=postgresql://postgres:pg@localhost:55432/postgres uv run pytest -m integration
 ```
 
@@ -258,6 +297,7 @@ $ git tag 1.0.1 && git push origin 1.0.1
 
 - `sarhatabaot/tns-mirror-server` → Docker Hub (multi-arch, with provenance and
   an SBOM)
+- `sarhatabaot/tns-mirror-api` → Docker Hub, same treatment
 - `tns-mirror-client` → PyPI (trusted publishing, with build attestations)
 
 The documentation site deploys separately, from `main`, whenever `docs/`
