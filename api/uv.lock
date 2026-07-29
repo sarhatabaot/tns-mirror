@@ -641,7 +641,7 @@ dev = [
 requires-dist = [
     { name = "granian", specifier = ">=2.0.0" },
     { name = "litestar", specifier = ">=2.24.0" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.3" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "psycopg-pool", specifier = ">=3.2.0" },
     { name = "tns-mirror-client", specifier = ">=1,<2" },
 ]

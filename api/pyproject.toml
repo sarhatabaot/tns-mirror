@@ -25,7 +25,7 @@ classifiers = [
 dependencies = [
   "litestar>=2.24.0",
   "granian>=2.0.0",
-  "psycopg[binary]>=3.2.3",
+  "psycopg[binary]>=3.3.4",
   "psycopg-pool>=3.2.0",
   # The cone search lives in exactly one place. This service is an HTTP
   # transport in front of the client, not a second implementation of the
