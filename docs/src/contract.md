@@ -13,8 +13,11 @@ shared code between the server and its consumers — after the server is extract
 to its own repository there *cannot* be — so the table definition is the entire,
 durable contract.
 
-Any language with a Postgres driver is a first-class consumer. `tns-mirror-client`
-(Python) will be a convenience over this, not a privileged path.
+Any language with a Postgres driver is a first-class consumer.
+[`tns-mirror-client`]({{ '/client/' | url }}) (Python) is a convenience over
+this, not a privileged path, and the optional
+[HTTP API]({{ '/api/' | url }}) serves that same client to anyone who cannot
+reach Postgres at all.
 
 The current contract is **v{{ site.schemaVersion }}**, published as
 [`schema_v{{ site.schemaVersion }}.sql`]({{ site.repository }}/blob/main/schema/schema_v{{ site.schemaVersion }}.sql).

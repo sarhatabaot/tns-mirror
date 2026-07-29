@@ -8,6 +8,10 @@ order: 2
 tags: docs
 ---
 
+This page is the **sync server's** configuration. The optional
+[HTTP API]({{ '/api/' | url }}) is configured separately and shares none of
+these settings except where the catalogue lives.
+
 Settings resolve in three layers, lowest priority first:
 
 ```

@@ -27,6 +27,7 @@ refuses.
 |---|---|
 | The server | **Write** access to its own database. Never shared |
 | Every consumer | A distinct **read-only** role: `SELECT` on two tables, nothing else |
+| The [HTTP API](/api/) | The same read-only role — never the writer's |
 
 `print-grants` generates the reader. It deliberately omits
 `ALTER DEFAULT PRIVILEGES`, which would grant `SELECT` on every table created in
@@ -39,6 +40,18 @@ supplies one out of band and it never reaches a shell history or a CI log.
 That boundary is verified by an integration test, not just asserted — the test
 creates the role, applies the grants, and confirms the reader is denied `INSERT`,
 `UPDATE`, `DELETE` and `DROP`.
+
+### The API is a separate container for this reason
+
+The optional [HTTP API]({{ '/api/' | url }}) is the only component intended to
+face a network, so it is the one most likely to be attacked — and it holds the
+read-only role. An exploit there reaches something that can `SELECT` two tables
+and nothing else, while the sync server's write credentials stay in a container
+that is not exposed at all.
+
+It also sets its database session read-only, so a bug in the service cannot
+write even if it were handed an over-privileged role by mistake. And it is
+optional: a deployment that does not need HTTP has no network-facing component.
 
 ## The database is not a public service
 
@@ -90,8 +103,12 @@ made under particular circumstances, and it should have to be re-made when those
 circumstances may have changed. A suppression without an expiry is a permanent
 hole nobody revisits.
 
-At present there are none: Bandit, Semgrep and pip-audit are clean with zero
-suppressions.
+At present there is exactly one: Bandit's `B104` for the API binding `0.0.0.0`,
+which is what running in a container means — the network namespace is the
+isolation boundary, and binding loopback would make the service unreachable from
+its own published port. It is overridable, and the shipped compose profile
+publishes on `127.0.0.1` rather than every interface. Everything else is clean
+with no suppressions.
 
 ## Small dependency tree
 
@@ -99,6 +116,11 @@ The server depends on three packages: `requests`, `psycopg`, and `PyYAML`. No we
 framework, no ORM, no scheduler library — the cron parser is hand-written for
 exactly this reason. Every dependency is attack surface in a published image, so
 adding a fourth needs a reason.
+
+The client carries one, `psycopg`, because it is embedded in other people's
+applications and every dependency it takes becomes theirs. The API necessarily
+carries more — a web framework and a server — which is a further argument for it
+being a separate, optional image rather than a mode of the server.
 
 ## Reporting a vulnerability
 

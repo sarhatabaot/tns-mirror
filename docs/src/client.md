@@ -137,3 +137,7 @@ There is nothing privileged about the Python client. The
 [contract]({{ '/contract/' | url }}) documents the tables, and the worked cone
 search there is the same query this library emits — port it and you have a client
 in any language with a Postgres driver.
+
+If you cannot reach Postgres at all — a browser, a network where only HTTP
+crosses the boundary — the optional [HTTP API]({{ '/api/' | url }}) serves this
+same library over HTTP, so you get the same geometry without porting it.

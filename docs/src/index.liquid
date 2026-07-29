@@ -45,7 +45,8 @@ summary: A self-hostable mirror of the TNS public objects catalogue, in SQL.
     <p>
       Somebody already runs a mirror and has given you a read-only connection
       string. Install the client and cross-match against it — no TNS account, no
-      SQL, and nothing to operate.
+      SQL, and nothing to operate. If you cannot reach Postgres at all, there is
+      an <a href="{{ '/api/' | url }}">optional HTTP API</a>.
     </p>
   </li>
 </ul>
@@ -69,9 +70,14 @@ summary: A self-hostable mirror of the TNS public objects catalogue, in SQL.
         <td>v{{ site.schemaVersion }}</td>
       </tr>
       <tr>
-        <td><code>tns-mirror-client</code></td>
+        <td><a href="{{ '/client/' | url }}"><code>tns-mirror-client</code></a></td>
         <td>PyPI package</td>
         <td>v1.0 — speaks schema v{{ site.schemaVersion }}</td>
+      </tr>
+      <tr>
+        <td><a href="{{ '/api/' | url }}"><code>tns-mirror-api</code></a></td>
+        <td>Docker image — <code>sarhatabaot/tns-mirror-api</code>, optional</td>
+        <td>v1.0</td>
       </tr>
     </tbody>
   </table>
@@ -83,7 +89,9 @@ summary: A self-hostable mirror of the TNS public objects catalogue, in SQL.
   a read-only role, and <a href="{{ '/contract/' | url }}">the schema is the
   contract</a> between them. The <a href="{{ '/client/' | url }}">client</a> is
   an ergonomic, typed wrapper over that same contract — never a privileged path,
-  and sharing no code with the server.
+  and sharing no code with the server. The
+  <a href="{{ '/api/' | url }}">API</a> is optional and serves that same client
+  over HTTP, in its own container holding only the read-only role.
 </p>
 
 <h2 id="in-one-minute">In one minute</h2>

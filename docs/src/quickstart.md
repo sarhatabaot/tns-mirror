@@ -205,6 +205,15 @@ with TnsMirror(dsn=os.environ["TNS_RO_DSN"]) as tns:
 See [the client]({{ '/client/' | url }}) for the full API, or
 [the contract]({{ '/contract/' | url }}) to query from any other language.
 
+If your consumers cannot reach Postgres, add the optional
+[HTTP API]({{ '/api/' | url }}) alongside the mirror:
+
+```console
+$ docker compose -f docker-compose.yml -f docker-compose.api.yml up -d
+```
+
+It uses the reader you just created — set `TNS_RO_PASSWORD` to that password.
+
 ## Just give me the smallest thing that works
 
 [`docker-compose.minimal.yml`]({{ site.repository }}/blob/main/quickstart/docker-compose.minimal.yml)

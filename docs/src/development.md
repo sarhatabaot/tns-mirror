@@ -34,6 +34,11 @@ client or to the consumer. If you find yourself adding geometry to the server, i
 is in the wrong package. The one exception is the `(ra, dec)` index, which is DDL
 and therefore part of the contract.
 
+The same rule binds the [HTTP API]({{ '/api/' | url }}): it is a transport in
+front of the client, and every query goes through it. Geometry added there would
+be a third implementation of something whose edge cases fail silently, and the
+project would find out from users rather than from tests.
+
 ## Running the tests
 
 ```console
@@ -52,6 +57,24 @@ $ TNS_TEST_DSN=postgresql://postgres:pg@localhost:55432/postgres uv run pytest -
 
 Each integration test gets its own Postgres schema, so they are isolated and the
 `TNS_SCHEMA` setting is exercised at the same time.
+
+### The API
+
+```console
+$ cd api
+$ uv sync --all-groups
+$ TNS_TEST_DSN=postgresql://postgres:pg@localhost:55432/postgres uv run pytest -m integration
+```
+
+Its tests drive the real application factory rather than assembling handlers by
+hand — the connection pool, the rate limiter and the startup schema-version
+check all live in the app, so testing the handlers alone would miss them.
+
+To look at the running service without a mirror or a TNS credential:
+
+```console
+$ ./scripts/api_demo.sh
+```
 
 ## pre-commit
 

@@ -112,6 +112,15 @@ treated as a no-op rather than a failure. Only the full refresh is strict: a fil
 that cannot be parsed raises rather than silently replacing a good catalogue with
 an empty one.
 
+## The optional HTTP API
+
+[`tns-mirror-api`]({{ '/api/' | url }}) runs as a separate container against the
+same database, using the read-only role. It has its own liveness and readiness
+endpoints, and its own rate limiting.
+
+It is not part of the sync server and does not need to be running for the mirror
+to stay current — nor does the mirror need it to be healthy.
+
 ## Storage
 
 The catalogue is around 10⁵ rows — small. The transient download area
