@@ -16,6 +16,8 @@ number the code does not claim:
     client/pyproject.toml
     client/src/tns_mirror_client/__init__.py
     client/src/tns_mirror_client/client.py     (SCHEMA_VERSION)
+    api/pyproject.toml
+    api/src/tns_mirror_api/__init__.py
     docs/src/_data/site.json                   (version and schemaVersion)
 
 Pass a tag to check a release publishes what it claims:
@@ -79,6 +81,10 @@ def main() -> int:
         "tns_mirror_client/__init__.py": dunder(
             "client/src/tns_mirror_client/__init__.py", "__version__"
         ),
+        "api/pyproject.toml": pyproject_version("api/pyproject.toml"),
+        "tns_mirror_api/__init__.py": dunder(
+            "api/src/tns_mirror_api/__init__.py", "__version__"
+        ),
         "docs/src/_data/site.json": site["version"],
     }
 
@@ -119,6 +125,17 @@ def main() -> int:
             f"See schema/README.md."
         )
 
+    # The API depends on the published client. If that range ever drifted off
+    # the contract major, the API could resolve a client speaking a different
+    # schema than the mirror it is pointed at.
+    api_deps = read("api/pyproject.toml")
+    expected_pin = f'"tns-mirror-client>={major},<{int(major) + 1}"'
+    if expected_pin not in api_deps:
+        problems.append(
+            f"api/pyproject.toml should depend on {expected_pin} to stay inside "
+            f"the schema major it serves"
+        )
+
     if args.tag and args.tag.removeprefix("v") != version:
         problems.append(
             f"tag {args.tag} does not match the project version {version}. "
@@ -134,6 +151,7 @@ def main() -> int:
     print(f"version {version} — speaks schema v{schema}")
     print("  server  → Docker Hub (never PyPI)")
     print("  client  → PyPI")
+    print("  api     → Docker Hub (never PyPI)")
     if args.tag:
         print(f"  tag {args.tag} matches")
     return 0

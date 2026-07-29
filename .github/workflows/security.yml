@@ -49,7 +49,7 @@ jobs:
 
       - name: Bandit
         run: |
-          uvx bandit -r server/src client/src \
+          uvx bandit -r server/src client/src api/src \
             --severity-level medium \
             --confidence-level medium
 
@@ -67,7 +67,7 @@ jobs:
             --error \
             --skip-unknown-extensions \
             --jobs 1 \
-            server/src client/src
+            server/src client/src api/src
 
   dependencies:
     name: deps (pip-audit + trivy fs)

@@ -26,6 +26,11 @@ jobs:
           dockerfile: server/Dockerfile
           failure-threshold: warning
 
+      - uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: api/Dockerfile
+          failure-threshold: warning
+
   build-and-scan:
     name: build + scan
     runs-on: ubuntu-latest
@@ -73,3 +78,31 @@ jobs:
         run: |
           docker tag tns-mirror-server:ci sarhatabaot/tns-mirror-server:smoke
           scripts/smoke_test.sh smoke
+
+      # The API is optional, so it gets its own build and scan rather than
+      # holding up the server's.
+      - name: Build API image
+        uses: docker/build-push-action@v7
+        with:
+          context: api
+          file: api/Dockerfile
+          push: false
+          load: true
+          tags: tns-mirror-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy scan the API image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: tns-mirror-api:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: API starts, and as non-root
+        run: |
+          set -euo pipefail
+          test "$(docker run --rm --entrypoint id tns-mirror-api:ci -u)" = "10001"
+          echo "api image runs as non-root"

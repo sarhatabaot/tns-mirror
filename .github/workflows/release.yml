@@ -1,6 +1,7 @@
 # Publish a GitHub Release, ship both artifacts.
 #
 #   server  ->  Docker Hub   (sarhatabaot/tns-mirror-server)
+#   api     ->  Docker Hub   (sarhatabaot/tns-mirror-api)     — optional service
 #   client  ->  PyPI         (tns-mirror-client)
 #
 # Pages is deliberately *not* here. docs.yml already deploys the site from main,
@@ -9,9 +10,9 @@
 # github-pages environment — whose default rule, "the default branch only", is
 # exactly the protection you want on the thing that serves your docs publicly.
 #
-# The server is *never* published to PyPI — it is a sync daemon, not a library,
-# and its pyproject carries the "Private :: Do Not Upload" classifier so an
-# accidental upload is refused by PyPI itself.
+# Neither the server nor the API is published to PyPI — they are services, not
+# libraries, and both pyprojects carry the "Private :: Do Not Upload" classifier
+# so an accidental upload is refused by PyPI itself.
 #
 # To cut a release: tag the commit, then publish a Release from that tag on
 # GitHub. Publishing the Release is what triggers this.
@@ -103,6 +104,16 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
           uv run pytest
+          uv run pytest -m integration
+
+      - name: API — lint and tests
+        working-directory: api
+        env:
+          TNS_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          uv sync --frozen --all-groups
+          uv run ruff check .
+          uv run ruff format --check .
           uv run pytest -m integration
 
       - name: Published contract is current
@@ -203,6 +214,62 @@ jobs:
         with:
           context: server
           file: server/Dockerfile
+          push: ${{ env.PUBLISH == 'true' }}
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # --- api -> Docker Hub ----------------------------------------------------
+  api:
+    name: api → Docker Hub
+    runs-on: ubuntu-latest
+    needs: smoke
+    environment: release
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ vars.DOCKERHUB_API_REPOSITORY || 'sarhatabaot/tns-mirror-api' }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ env.TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
+            type=raw,value=latest
+
+      - name: Registry credentials are present
+        if: env.PUBLISH == 'true'
+        env:
+          USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "$USERNAME" ] || [ -z "$TOKEN" ]; then
+            echo "::error::DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must both be set"
+            exit 1
+          fi
+
+      - name: Log in to Docker Hub
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: api
+          file: api/Dockerfile
           push: ${{ env.PUBLISH == 'true' }}
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}

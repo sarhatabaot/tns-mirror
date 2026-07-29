@@ -124,6 +124,51 @@ jobs:
           TNS_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
         run: uv run pytest -m integration
 
+  api:
+    name: api
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv python install "$(cat .python-version)"
+      - run: uv sync --frozen --all-groups
+
+      - name: Ruff (lint)
+        run: uv run ruff check .
+
+      - name: Ruff (format check)
+        run: uv run ruff format --check .
+
+      # Seeded from the published contract, and driving the real application
+      # factory — the pool, the rate limiter and the startup version check all
+      # live in the app rather than in the handlers.
+      - name: Tests
+        env:
+          TNS_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+        run: uv run pytest -m integration
+
   # The client claims to support 3.11+, so it is tested there, not only on the
   # version the developers happen to run.
   client-python-versions:

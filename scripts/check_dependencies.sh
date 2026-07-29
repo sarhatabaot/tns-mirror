@@ -30,3 +30,5 @@ audit server "$(cat server/.python-version)"
 # The client supports 3.11+, so it is audited at its floor — that is the
 # resolution consumers on the oldest supported Python will actually get.
 audit client "3.11"
+
+audit api "$(cat api/.python-version)"

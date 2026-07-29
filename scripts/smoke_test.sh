@@ -163,5 +163,32 @@ for argv in "sync" "sync --hour 3" "catch-up 2" "serve"; do
 done
 pass "sync, catch-up and serve refuse without a TNS credential"
 
+# --- the optional API, if its image is present -------------------------------
+# Skipped rather than failed when the image is absent: the API is optional, and
+# a server release must not be blocked by it.
+API_IMAGE="sarhatabaot/tns-mirror-api:$TAG"
+if docker image inspect "$API_IMAGE" >/dev/null 2>&1; then
+    net=$(docker network ls --filter "name=${PROJECT}_default" --format '{{.Name}}' | head -1)
+    db_host=$(compose ps -q db)
+    if [ -n "$net" ] && [ -n "$db_host" ]; then
+        api_id=$(docker run -d --rm --network "$net" \
+            -e PGHOST=db -e PGUSER=tns_ro -e PGPASSWORD="$READER_PASSWORD" \
+            -e PGDATABASE=tnsdb -e TNS_API_ROOT_PATH=/tns \
+            "$API_IMAGE" 2>/dev/null) || fail "the API image would not start"
+        ok=""
+        for _ in $(seq 1 40); do
+            if docker exec "$api_id" python -m tns_mirror_api.healthcheck >/dev/null 2>&1; then
+                ok=yes; break
+            fi
+            sleep 1
+        done
+        docker rm -f "$api_id" >/dev/null 2>&1 || true
+        [ -n "$ok" ] || fail "the API image never became healthy against the reader role"
+        pass "API serves under a path prefix, using the read-only role"
+    fi
+else
+    echo "  skip API (no $API_IMAGE built)"
+fi
+
 echo
 echo "smoke test passed: the published image and compose file work end to end"

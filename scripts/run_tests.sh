@@ -8,7 +8,7 @@
 # test what it claims to.
 set -euo pipefail
 
-package=${1:?usage: run_tests.sh <server|client> [pytest args...]}
+package=${1:?usage: run_tests.sh <server|client|api> [pytest args...]}
 shift
 
 cd "$(dirname "$0")/../$package"
