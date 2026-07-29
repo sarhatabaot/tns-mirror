@@ -19,4 +19,18 @@
 #     expires: 2027-01-01
 #     owner: maintainers
 
-waivers: []
+waivers:
+  - id: BANDIT-B104-api-bind
+    tool: bandit
+    rule: B104
+    file: api/src/tns_mirror_api/__main__.py
+    reason: >-
+      The API server binds 0.0.0.0 by default because it runs in a container,
+      where the network namespace is the isolation boundary and binding loopback
+      would make the service unreachable from anywhere including its own
+      published port. It is overridable with TNS_API_HOST for anyone running it
+      outside a container. The service is read-only, rate-limited, and intended
+      to sit behind an ingress; the shipped compose profile publishes it on
+      127.0.0.1 rather than every interface.
+    expires: 2027-01-31
+    owner: maintainers

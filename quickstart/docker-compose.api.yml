@@ -1,0 +1,41 @@
+# Optional read-only HTTP API, on top of the mirror.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.api.yml up -d
+#
+# Adds one service. It connects with the *reader* role, not the writer — create
+# one first:
+#
+#   docker compose exec server tns-mirror-server print-grants --database tnsdb
+#
+# then put that password in TNS_RO_PASSWORD (in .env, or inline below).
+
+services:
+  api:
+    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.2}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${TNS_API_BIND:-127.0.0.1:8000}:8000"
+    environment:
+      # Read-only credentials. If this service is ever compromised, the role it
+      # holds can SELECT two tables and nothing else — which is the reason it is
+      # a separate container from the sync server.
+      PGHOST: db
+      PGUSER: ${TNS_RO_USER:-tns_ro}
+      PGPASSWORD: ${TNS_RO_PASSWORD:?create a reader with print-grants and set TNS_RO_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-tnsdb}
+
+      TNS_API_RATE_LIMIT: ${TNS_API_RATE_LIMIT:-60}
+      # Turn on only when something you control sets X-Forwarded-For; otherwise
+      # any caller can spoof it and get a fresh rate-limit bucket per request.
+      TNS_API_TRUST_PROXY: ${TNS_API_TRUST_PROXY:-false}
+      # Mount under a prefix when your proxy passes one through, e.g. /tns.
+      TNS_API_ROOT_PATH: ${TNS_API_ROOT_PATH:-}
+
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp

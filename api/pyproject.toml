@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tns-mirror-api"
+version = "1.0.2"
+description = "Optional read-only HTTP API over a tns-mirror catalogue."
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+authors = [{ name = "tns-mirror contributors" }]
+keywords = ["astronomy", "tns", "transients", "catalogue", "api"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Astronomy",
+  # Ships as a Docker image, never to PyPI. PyPI *rejects* an upload carrying
+  # this classifier, so an accidental `twine upload` fails rather than
+  # publishing a service as a library. Only tns-mirror-client is a PyPI package.
+  "Private :: Do Not Upload",
+]
+
+dependencies = [
+  "litestar>=2.24.0",
+  "granian>=2.0.0",
+  "psycopg[binary]>=3.2.3",
+  "psycopg-pool>=3.2.0",
+  # The cone search lives in exactly one place. This service is an HTTP
+  # transport in front of the client, not a second implementation of the
+  # geometry — three of its edge cases fail silently, and a divergent copy
+  # would be found by users rather than by tests.
+  "tns-mirror-client>=1,<2",
+]
+
+[project.scripts]
+tns-mirror-api = "tns_mirror_api.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/sarhatabaot/tns-mirror"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.3",
+  "pytest-cov>=5.0.0",
+  "ruff>=0.7.0",
+  "httpx>=0.27",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tns_mirror_api"]
+
+[tool.ruff]
+line-length = 96
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "S", "C4", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106", "SLF001", "S608"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+  "integration: needs a live Postgres (TNS_TEST_DSN); skipped otherwise",
+]
+filterwarnings = ["error"]
