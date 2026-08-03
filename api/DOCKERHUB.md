@@ -137,7 +137,10 @@ container healthcheck follows it too.
 ```nginx
 location /tns/ {
     proxy_pass http://tns-api:8000/tns/;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # $remote_addr, not $proxy_add_x_forwarded_for, when this nginx is the
+    # edge: the limiter charges the left-most entry, and appending leaves
+    # that slot caller-controlled.
+    proxy_set_header X-Forwarded-For $remote_addr;
 }
 ```
 

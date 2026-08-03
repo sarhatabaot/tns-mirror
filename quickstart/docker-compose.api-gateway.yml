@@ -1,0 +1,132 @@
+# Keyed, tiered access to the API — everything configured inside this stack.
+#
+#   cp nginx/tns-api-keys.map.example nginx/tns-api-keys.map
+#   chmod 600 nginx/tns-api-keys.map          # then put real keys in it
+#
+#   docker compose -f docker-compose.yml \
+#                  -f docker-compose.api.yml \
+#                  -f docker-compose.api-gateway.yml up -d
+#
+# Adds a gateway and a second API container:
+#
+#     :8080 gateway ──► api        capped tier   60/min, 1000 rows, 1 degree
+#                   └─► api-batch  loader tier   unlimited, whole-sky, own pool
+#
+# The gateway authenticates every caller by API key and picks the tier from
+# the key's name. Consumers all use one URL; nothing outside this stack knows
+# a key exists. See nginx/gateway.conf.
+#
+# Whoever runs the outer reverse proxy gets nginx/handoff.conf and nothing
+# else: one location, pointing at 127.0.0.1:8080, that never needs editing
+# again — not to add a consumer, rotate a key, or change a limit.
+
+services:
+  gateway:
+    image: nginx:1.27-alpine
+    depends_on: [api, api-batch]
+
+    # Loopback only. The outer proxy runs on this host and is the sole route
+    # in from anywhere else.
+    ports:
+      - "${TNS_GATEWAY_BIND:-127.0.0.1:8080}:80"
+
+    volumes:
+      - ./nginx/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+      # nginx will not start if this is missing, which is the behaviour you
+      # want: no key file, no access, rather than an open door.
+      - ./nginx/tns-api-keys.map:/etc/nginx/tns-api-keys.map:ro
+
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    # The master process needs these paths writable; nginx creates what it
+    # needs in them at startup. Workers already drop to the unprivileged
+    # 'nginx' user on their own.
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+
+  # The capped tier. Defined in docker-compose.api.yml; these are the changes
+  # that being behind the gateway implies.
+  api:
+    # No published port. The gateway reaches it over the compose network, and
+    # leaving 8000 on the host would be a way around the key check — the outer
+    # proxy could be pointed straight at it, by accident or otherwise.
+    #
+    # '!reset []' rather than '[]'. Compose MERGES sequences across override
+    # files, so an empty list leaves the base file's published port exactly
+    # where it was; only the reset tag removes it. Verify after any change to
+    # these files, because the failure is silent and the port stays open:
+    #
+    #   docker compose -f docker-compose.yml -f docker-compose.api.yml \
+    #                  -f docker-compose.api-gateway.yml config | grep -A3 'api:'
+    #
+    # Needs Compose v2.24+ (the tag is ignored, not an error, on older ones —
+    # which is the silent failure it is worth checking for).
+    ports: !reset []
+    environment:
+      TNS_API_ROOT_PATH: ${TNS_API_ROOT_PATH:-/tns-mirror/api}
+      # Rate limiting belongs to the gateway now, where the identity is the
+      # API key rather than an address. This stays only as a backstop for
+      # something that reaches the container without passing through it.
+      TNS_API_RATE_LIMIT: ${TNS_API_RATE_LIMIT:-600}
+      # No longer needed, and better off: X-Forwarded-For arrives from the
+      # outer proxy, which this stack does not control, and nothing here has
+      # to trust it any more.
+      TNS_API_TRUST_PROXY: "false"
+
+  # The loader tier. Same image, same read-only role — nothing here reaches
+  # further into the database than the capped tier does. It only lifts
+  # ceilings that exist to stop one caller monopolising a shared service.
+  #
+  # A separate container rather than a per-key exemption because the ceiling
+  # that actually binds a loader is TNS_API_POOL_MAX, and a pool cannot be
+  # divided per caller. Separate containers cannot starve each other.
+  api-batch:
+    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.2}
+    depends_on:
+      db:
+        condition: service_healthy
+
+    environment:
+      PGHOST: db
+      PGUSER: ${TNS_RO_USER:-tns_ro}
+      PGPASSWORD: ${TNS_RO_PASSWORD:?create a reader with print-grants and set TNS_RO_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-tnsdb}
+
+      # The SAME prefix as the capped tier. Both answer on one URL and the
+      # gateway chooses between them, so both must serve the same paths — a
+      # project changes tier without changing anything it sends.
+      TNS_API_ROOT_PATH: ${TNS_API_ROOT_PATH:-/tns-mirror/api}
+
+      # Effectively unlimited; the gateway exempts this tier anyway. The
+      # config rejects anything below 1, so it is a large number rather than
+      # a disable flag.
+      TNS_API_RATE_LIMIT: ${TNS_API_BATCH_RATE_LIMIT:-1000000}
+      TNS_API_TRUST_PROXY: "false"
+
+      # The ceilings a bulk consumer actually hits. Both are clamps, not
+      # errors: at the defaults a request for 5000 rows returns exactly 1000
+      # with nothing to say it was truncated, so they are raised here rather
+      # than discovered as silently short results.
+      #
+      # 648000" is 180 degrees, the whole sky. That path is correct — the
+      # client's bounding box has an explicit branch for radius >= 90 degrees
+      # and separation is haversine — but it is a full scan and a sort, so
+      # treat it as a bulk pull rather than a cone search.
+      TNS_API_MAX_RADIUS_ARCSEC: ${TNS_API_BATCH_MAX_RADIUS_ARCSEC:-648000}
+      TNS_API_MAX_LIMIT: ${TNS_API_BATCH_MAX_LIMIT:-200000}
+
+      # Its own pool. Raising this buys parallelism, but both tiers and the
+      # sync server all draw on Postgres max_connections (default 100).
+      TNS_API_POOL_MIN: ${TNS_API_BATCH_POOL_MIN:-1}
+      TNS_API_POOL_MAX: ${TNS_API_BATCH_POOL_MAX:-10}
+
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp

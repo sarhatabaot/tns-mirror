@@ -10,7 +10,39 @@ schema change bumps the major on both.
 
 ## [Unreleased]
 
-## [Unreleased]
+### Added — keyed, tiered HTTP access (deployment recipe)
+
+For deployments where the outer reverse proxy belongs to someone else, and
+access has to be granted, revoked and metered without involving them.
+
+- **`quickstart/docker-compose.api-gateway.yml`** adds a small nginx gateway and
+  a second API container in front of the mirror. An `X-API-Key` maps to a
+  consumer name, the name selects a tier, and each tier is its own container
+  with its own pool and ceilings. Every consumer uses one URL; changing a
+  consumer's tier changes nothing they send.
+- **Nothing outside the stack holds a key.** `quickstart/nginx/handoff.conf` is
+  the entire integration handed to whoever runs the outer proxy: one `location`
+  pointing at loopback, which never needs editing again — not to add a consumer,
+  rotate a key, or change a limit.
+- **Rate limiting keys on the API key, not the address.** Two projects behind one
+  NAT get separate budgets and one project across a cluster shares a single
+  budget, neither of which an address-based limit can express. It also removes
+  any need to trust `X-Forwarded-For`, which is why the API containers now set
+  `TNS_API_TRUST_PROXY=false` in this configuration.
+- The API itself is **unchanged**: no key handling in a published image, which
+  keeps its one secret the read-only DSN. The gateway logs each consumer's name
+  and never the key.
+- The capped tier's API port is not published when the gateway is in use, so
+  there is no route around the key check.
+
+### Fixed — documentation
+
+- The reverse-proxy examples set `X-Forwarded-For` with
+  `$proxy_add_x_forwarded_for`, which **appends** to whatever the client sent.
+  The limiter charges the left-most entry, so at the edge a caller could keep
+  that slot and mint a fresh bucket per request — defeating the point of
+  `TNS_API_TRUST_PROXY`. Now `$remote_addr`, with a note on when appending is
+  correct.
 
 ### Added — `tns-mirror-api` (Docker Hub, optional)
 

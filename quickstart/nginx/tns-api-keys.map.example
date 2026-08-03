@@ -1,0 +1,32 @@
+# tns-mirror API keys.  "<key>"  <name>;
+#
+#     cp tns-api-keys.map.example tns-api-keys.map
+#     chmod 600 tns-api-keys.map
+#
+# The real file is gitignored. This example is not — every key in it is a
+# placeholder, and none of them work.
+#
+# Issue a key:      openssl rand -hex 20
+# Apply a change:   docker compose exec gateway nginx -t \
+#                     && docker compose exec gateway nginx -s reload
+#
+# Reloading is graceful: in-flight requests finish on the old config.
+#
+# THE NAME SELECTS THE TIER.
+#
+#   batch-*    loader tier   no rate limit, ceilings raised, own pool
+#   anything   capped tier   60 req/min per key, 1000 rows, 1 degree
+#
+# So renaming an entry moves that consumer between tiers, and deleting the
+# line revokes it. The name is also what shows up in the gateway's access log
+# next to each request, which is the only record of who called: keys are never
+# logged. Give one key per consumer, not one per person — you cannot tell two
+# users of the same key apart.
+
+# --- loader tier -----------------------------------------------------------
+"k_REPLACE_ME_0000000000000000000000"   batch-ingest-alpha;
+"k_REPLACE_ME_1111111111111111111111"   batch-ingest-beta;
+
+# --- capped tier -----------------------------------------------------------
+"k_REPLACE_ME_2222222222222222222222"   team-carol;
+"k_REPLACE_ME_3333333333333333333333"   team-dev-notebook;

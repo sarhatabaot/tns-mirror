@@ -150,6 +150,88 @@ $ docker compose -f docker-compose.minimal.yml up -d
 Bot mode needs all three of `TNS_API_KEY`, `TNS_BOT_ID` and `TNS_BOT_NAME` — the
 key authenticates the request, the id and name identify which bot is asking.
 
+## Optional: keyed HTTP access, in two tiers
+
+For serving colleagues over HTTP while a couple of high-throughput jobs get
+room to run — with every consumer authenticated, and none of it configured
+outside your own stack.
+
+```
+outer proxy ──► :8080 gateway ──► api        capped tier   60/min, 1000 rows, 1°
+                                └─► api-batch  loader tier   unlimited, whole sky
+```
+
+Everyone uses **one URL**. The `X-API-Key` header selects the tier, so a
+consumer is promoted, demoted or revoked by editing one file and reloading.
+
+```console
+$ cp nginx/tns-api-keys.map.example nginx/tns-api-keys.map
+$ chmod 600 nginx/tns-api-keys.map
+$ openssl rand -hex 20                     # one key per consumer
+```
+
+A key's **name** picks its tier — anything starting `batch-` gets the loader
+tier, everything else the capped one:
+
+```
+"k_7f3a9c21e5b84d06a1f2…"   batch-ingest-alpha;
+"k_9e04ab762d3f15c8b0e7…"   team-carol;
+```
+
+Then, with a reader role already created (step 5) and `TNS_RO_PASSWORD` set:
+
+```console
+$ docker compose -f docker-compose.yml \
+                 -f docker-compose.api.yml \
+                 -f docker-compose.api-gateway.yml up -d
+```
+
+```console
+$ curl -H "X-API-Key: k_9e04…" \
+    'http://127.0.0.1:8080/tns-mirror/api/v1/cone?ra=203.1&dec=10.2&radius_arcsec=60'
+```
+
+### Handing it to whoever runs the reverse proxy
+
+Give them [`nginx/handoff.conf`](nginx/handoff.conf). It is one `location`
+block pointing at `127.0.0.1:8080`, and it never needs editing again — not to
+add a consumer, rotate a key, or change a limit. No key is ever visible
+outside your stack.
+
+### Everyday operations
+
+```console
+$ docker compose exec gateway nginx -t              # check before reloading
+$ docker compose exec gateway nginx -s reload       # apply a key change
+$ docker compose logs -f gateway                    # who called what
+```
+
+Reloading is graceful — in-flight requests finish on the old config. The log
+records each consumer's **name**, never the key:
+
+```
+127.0.0.1 fwd=- key=team-carol [03/Aug/2026:13:04:44 +0300] "GET /tns-mirror/api/v1/objects/SN2026xyz HTTP/1.1" 200 83 0.001s
+```
+
+Rate limits are per **key**, not per address, so two projects behind one NAT
+get separate budgets and one project across a cluster shares a single budget.
+Where each knob lives:
+
+| | |
+|---|---|
+| who may call, and their tier | `nginx/tns-api-keys.map` — reload |
+| requests per minute per tier | `nginx/gateway.conf` — reload |
+| query ceilings, pool size | `.env` — recreate |
+
+> **The gateway speaks plain HTTP, so keys cross it in the clear.** That is
+> fine over loopback to a proxy on the same host. If anything terminates
+> further away, put TLS in front before issuing the first key.
+
+Query ceilings are per **tier**, not per key, because they are per-process
+configuration. Both are clamps rather than errors: at the capped tier a
+request for 5000 rows returns exactly 1000, with nothing in the response to
+say it was truncated.
+
 ## Optional: a YAML config file
 
 Useful when you would rather keep your configuration in version control, with
