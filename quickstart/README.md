@@ -191,6 +191,20 @@ $ curl -H "X-API-Key: k_9e04…" \
     'http://127.0.0.1:8080/tns-mirror/api/v1/cone?ra=203.1&dec=10.2&radius_arcsec=60'
 ```
 
+### Or take the whole stack as one file
+
+[`docker-compose.full.yml`](docker-compose.full.yml) is all five services —
+database, sync server, both API tiers and the gateway — with no override files.
+Five values to edit, then `up -d`:
+
+```console
+$ docker compose -f docker-compose.full.yml up -d
+```
+
+Use it if you would rather read one file than reason about how three merge. The
+overlay route above is the same thing assembled from parts, and is better if you
+already run the base stack and are adding the API to it.
+
 ### Handing it to whoever runs the reverse proxy
 
 Give them [`nginx/handoff.conf`](nginx/handoff.conf). It is one `location`
