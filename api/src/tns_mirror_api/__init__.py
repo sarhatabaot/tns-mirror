@@ -5,6 +5,6 @@ the cone search. Ships as a Docker image; the sync server stays responsible for
 downloading and writing, and this connects with the read-only role.
 """
 
-__version__ = "1.0.2"
+__version__ = "1.0.4"
 
 __all__ = ["__version__"]

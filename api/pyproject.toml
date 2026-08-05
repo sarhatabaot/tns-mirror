@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tns-mirror-api"
-version = "1.0.2"
+version = "1.0.4"
 description = "Optional read-only HTTP API over a tns-mirror catalogue."
 readme = "README.md"
 requires-python = ">=3.13"

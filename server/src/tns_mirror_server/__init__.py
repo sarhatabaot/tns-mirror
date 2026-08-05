@@ -6,7 +6,7 @@ cross-matching: querying the mirror is ``tns-mirror-client``'s job, and the
 schema is the contract between them.
 """
 
-__version__ = "1.0.2"
+__version__ = "1.0.4"
 
 #: The project's major version IS this number: v1.x.y speaks schema v1, for
 #: both the server image and the client library. A schema break bumps both.
