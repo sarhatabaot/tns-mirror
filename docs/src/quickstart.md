@@ -238,7 +238,7 @@ services:
       retries: 20
 
   server:
-    image: sarhatabaot/tns-mirror-server:1.0.2
+    image: sarhatabaot/tns-mirror-server:1.0.4
     depends_on:
       db:
         condition: service_healthy

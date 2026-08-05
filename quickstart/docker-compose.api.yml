@@ -11,7 +11,7 @@
 
 services:
   api:
-    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.2}
+    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.4}
     depends_on:
       db:
         condition: service_healthy

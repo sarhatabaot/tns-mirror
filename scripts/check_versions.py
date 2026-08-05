@@ -89,6 +89,35 @@ DERIVED: list[tuple[str, str, str]] = [
 ]
 
 
+#: Image tags and version pins in the compose files and the documentation.
+#: Unlike the files above these may hold several pins each, and all of them must
+#: equal VERSION — a quickstart telling people to pull a superseded image is a
+#: silent way to ship the wrong thing. Anchored on distinctive text so a version
+#: number that means something else is never rewritten.
+PIN_PATTERNS = [
+    # image: sarhatabaot/tns-mirror-api:1.0.4
+    # image: tns-mirror-server:${TNS_MIRROR_VERSION:-1.0.4}
+    r"(tns-mirror-(?:server|api):(?:\$\{TNS_MIRROR_VERSION:-)?)(\d+\.\d+\.\d+)",
+    # TNS_MIRROR_VERSION=1.0.4
+    r"(TNS_MIRROR_VERSION=)(\d+\.\d+\.\d+)",
+    # - **Tags:** `1.0.4`, `1.0`, `latest`   (the `1.0` alias is left alone)
+    r"(\*\*Tags:\*\* `)(\d+\.\d+\.\d+)",
+]
+
+PINNED_FILES = [
+    "quickstart/docker-compose.minimal.yml",
+    "quickstart/docker-compose.api.yml",
+    "quickstart/docker-compose.api-gateway.yml",
+    "quickstart/docker-compose.full.yml",
+    "quickstart/.env.example",
+    "server/docker-compose.yml",
+    "server/DOCKERHUB.md",
+    "api/DOCKERHUB.md",
+    "api/README.md",
+    "docs/src/quickstart.md",
+]
+
+
 def read(path: str) -> str:
     return (REPO_ROOT / path).read_text(encoding="utf-8")
 
@@ -129,6 +158,30 @@ def write(path: str, pattern: str, version: str) -> bool:
     return True
 
 
+def pin_versions(path: str) -> list[str]:
+    """Every pinned version in this file, in order."""
+    text = read(path)
+    return [m.group(2) for pat in PIN_PATTERNS for m in re.finditer(pat, text)]
+
+
+def write_pins(path: str, version: str) -> int:
+    """Set every pin in this file. Returns how many changed."""
+    text = read(path)
+    changed = 0
+    for pattern in PIN_PATTERNS:
+
+        def replace(match: re.Match[str]) -> str:
+            nonlocal changed
+            if match.group(2) != version:
+                changed += 1
+            return match.group(1) + version
+
+        text = re.sub(pattern, replace, text)
+    if changed:
+        (REPO_ROOT / path).write_text(text, encoding="utf-8")
+    return changed
+
+
 def dunder_int(path: str, name: str) -> int:
     match = re.search(rf"^{name}\s*=\s*(\d+)", read(path), re.MULTILINE)
     if match is None:
@@ -154,12 +207,16 @@ def main() -> int:
         changed = [label for label, path, pat in DERIVED if write(path, pat, source)]
         for label in changed:
             print(f"  updated  {label}")
+        for path in PINNED_FILES:
+            count = write_pins(path, source)
+            if count:
+                changed.append(path)
+                print(f"  updated  {path}  ({count} pin{'s' if count > 1 else ''})")
+        total = len(DERIVED) + len(PINNED_FILES)
         print(
             f"version {source} — {len(changed)} updated, "
-            f"{len(DERIVED) - len(changed)} already current"
+            f"{total - len(changed)} already current"
         )
-        if not changed:
-            return 0
 
     versions = {label: current(path, pat) for label, path, pat in DERIVED}
 
@@ -182,6 +239,14 @@ def main() -> int:
         return "\n".join(f"      {name:<{width}}  {value}" for name, value in values.items())
 
     drifted = {label: got for label, got in versions.items() if got != source}
+
+    # Pinned image tags, which a reader copies verbatim: a stale one here sends
+    # someone to pull a superseded image, and nothing else would catch it.
+    for path in PINNED_FILES:
+        stale = sorted({got for got in pin_versions(path) if got != source})
+        if stale:
+            drifted[path] = ", ".join(stale)
+
     if drifted:
         problems.append(
             f"these do not match {VERSION_FILE} ({source}) — run "

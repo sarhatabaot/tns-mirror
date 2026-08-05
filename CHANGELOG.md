@@ -10,6 +10,41 @@ schema change bumps the major on both.
 
 ## [Unreleased]
 
+## [1.0.4] — 2026-08-05
+
+Ships the optional HTTP API, which 1.0.3 was meant to and did not: that tag was
+cut while every file still said 1.0.2, so the release verified and stopped
+before publishing anything. **1.0.3 does not exist on PyPI or Docker Hub** —
+nothing was published under it, and the tag is left in place only so it is not
+reused. Go from 1.0.2 to 1.0.4.
+
+Schema is **unchanged at v1**. Nothing here touches the contract, so a consumer
+pinning `tns-mirror-client>=1,<2` needs no action.
+
+### Changed — one file to bump
+
+- **`VERSION` at the repository root is now the source of the project version**,
+  and the other seven files are derived from it:
+
+      echo 1.0.5 > VERSION
+      python3 scripts/check_versions.py --write
+
+  Same shape as `render_schema.py` → `schema_v1.sql`: one source, a generator,
+  CI failing on drift. The derived files keep literals rather than importing a
+  shared module because the images build with a **narrow context** — `server/`
+  and `api/`, not the repository root — so nothing inside them can read a
+  top-level file at build time. Each artifact stays self-contained.
+- The check now compares every file against `VERSION` rather than only against
+  each other, so it names the file that drifted instead of reporting only that
+  they disagree. It also covers the image tags pinned in the compose files and
+  documentation, which previously drifted silently and left the quickstart
+  telling people to pull a superseded image.
+- `SCHEMA_VERSION` is deliberately **not** derived. It changes on its own rare,
+  deliberate occasions, and a major bump without a schema change is exactly the
+  mistake the major-equals-schema rule exists to catch.
+- The pre-commit hook's file pattern did not include `VERSION`, so editing only
+  the source file would not have run the check.
+
 ### Added — keyed, tiered HTTP access (deployment recipe)
 
 For deployments where the outer reverse proxy belongs to someone else, and
@@ -291,7 +326,8 @@ Several points were under-specified in the design document and resolved here:
 - **Cone search is not in the server.** It belongs to the client; the server only
   owns the `(ra, dec)` index, which is DDL and therefore contract.
 
-[Unreleased]: https://github.com/sarhatabaot/tns-mirror/compare/1.0.2...HEAD
+[Unreleased]: https://github.com/sarhatabaot/tns-mirror/compare/1.0.4...HEAD
+[1.0.4]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.4
 [1.0.2]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.2
 [1.0.1]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.1
 [1.0.0]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.0

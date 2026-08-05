@@ -85,7 +85,7 @@ services:
   # that actually binds a loader is TNS_API_POOL_MAX, and a pool cannot be
   # divided per caller. Separate containers cannot starve each other.
   api-batch:
-    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.2}
+    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.4}
     depends_on:
       db:
         condition: service_healthy

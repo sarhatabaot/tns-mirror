@@ -71,7 +71,7 @@ services:
 
   # The only writer. Downloads from TNS and owns the schema.
   server:
-    image: sarhatabaot/tns-mirror-server:${TNS_MIRROR_VERSION:-1.0.2}
+    image: sarhatabaot/tns-mirror-server:${TNS_MIRROR_VERSION:-1.0.4}
     depends_on:
       db:
         condition: service_healthy
@@ -97,7 +97,7 @@ services:
   # ── capped tier ───────────────────────────────────────────────────────────
   # What everyone gets unless their key says otherwise.
   api:
-    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.2}
+    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.4}
     depends_on:
       db:
         condition: service_healthy
@@ -138,7 +138,7 @@ services:
   # that actually binds a loader is the connection pool, and a pool cannot be
   # divided per caller. Separate containers cannot starve each other.
   api-batch:
-    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.2}
+    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.4}
     depends_on:
       db:
         condition: service_healthy

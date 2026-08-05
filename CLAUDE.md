@@ -61,7 +61,8 @@ database driver and a scheduler, not Django.
 
 1. Edit `VERSION` at the repository root. That is the only file you edit.
 2. Run `python3 scripts/check_versions.py --write` to propagate it into the
-   seven derived files. CI and pre-commit fail if they drift.
+   seven derived files and the image tags pinned across the compose files and
+   documentation. CI and pre-commit fail if any of them drift.
 
 The derived files hold literals rather than reading `VERSION` at runtime
 because the images build with a **narrow context** — `server/` and `api/`, not
