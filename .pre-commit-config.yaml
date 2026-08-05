@@ -102,15 +102,17 @@ repos:
         language: system
         pass_filenames: false
 
-      # The version is restated in five files and its major must equal the
-      # schema version. Drift is invisible until a release publishes the wrong
-      # number, which cannot be taken back.
+      # VERSION is the source; seven files are derived from it, and its major
+      # must equal the schema version. Drift is invisible until a release
+      # publishes the wrong number, which cannot be taken back.
+      #
+      #     python3 scripts/check_versions.py --write
       - id: versions-agree
         name: versions agree across the project
         entry: python3 scripts/check_versions.py
         language: system
         pass_filenames: false
-        files: ^((server|client|api)/pyproject\.toml|docs/src/_data/site\.json|.*/__init__\.py|client/src/tns_mirror_client/client\.py)$
+        files: ^(VERSION|(server|client|api)/pyproject\.toml|docs/src/_data/site\.json|.*/__init__\.py|client/src/tns_mirror_client/client\.py)$
 
   # --- slower gates: on push ------------------------------------------------
   - repo: https://github.com/semgrep/semgrep

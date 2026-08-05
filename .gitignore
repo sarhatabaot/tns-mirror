@@ -21,6 +21,9 @@ htmlcov/
 config/tns-mirror.yaml
 *.local.yaml
 
+# API gateway keys. The .example alongside it holds placeholders only.
+quickstart/nginx/tns-api-keys.map
+
 # Documentation site
 node_modules/
 docs/_site/

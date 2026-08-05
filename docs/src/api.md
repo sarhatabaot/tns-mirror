@@ -112,12 +112,32 @@ the same thing.
 ```nginx
 location /tns/ {
     proxy_pass http://tns-api:8000/tns/;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # Overwrite, not $proxy_add_x_forwarded_for. The limiter charges the
+    # LEFT-MOST entry, and appending leaves that slot caller-controlled.
+    proxy_set_header X-Forwarded-For $remote_addr;
 }
 ```
 
+Use `$remote_addr` when this nginx is the edge, and
+`$proxy_add_x_forwarded_for` only when another proxy you trust sits in front of
+it — appending puts nginx's view to the *right* of whatever the client sent, so
+at the edge a caller keeps the left-most slot and mints a fresh bucket per
+request.
+
 Leave it empty if your proxy *strips* the prefix before forwarding — the service
 is then already being asked for the paths it serves.
+
+### Keyed access, in tiers
+
+To authenticate callers and give some of them more headroom than others, put a
+small nginx gateway inside your own stack: it maps an `X-API-Key` to a consumer
+name, the name selects a tier, and each tier is a separate API container with
+its own pool and ceilings. Rate limiting then keys on the API key rather than on
+an address, which removes the need to trust `X-Forwarded-For` at all.
+
+The API itself stays unchanged and holds no keys — see
+[`quickstart/docker-compose.api-gateway.yml`]({{ site.repository }}/blob/main/quickstart/docker-compose.api-gateway.yml)
+and the [quickstart README]({{ site.repository }}/blob/main/quickstart/README.md).
 
 ## Query caps
 

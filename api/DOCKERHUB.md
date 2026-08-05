@@ -39,7 +39,7 @@ read-only, so a bug in it cannot write even through an over-privileged role.
 ```yaml
 services:
   api:
-    image: sarhatabaot/tns-mirror-api:1.0.2
+    image: sarhatabaot/tns-mirror-api:1.0.4
     ports:
       - "127.0.0.1:8000:8000"
     environment:
@@ -137,7 +137,10 @@ container healthcheck follows it too.
 ```nginx
 location /tns/ {
     proxy_pass http://tns-api:8000/tns/;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # $remote_addr, not $proxy_add_x_forwarded_for, when this nginx is the
+    # edge: the limiter charges the left-most entry, and appending leaves
+    # that slot caller-controlled.
+    proxy_set_header X-Forwarded-For $remote_addr;
 }
 ```
 
@@ -159,7 +162,7 @@ depends on exists in exactly one place rather than once per consumer.
 
 ## Image
 
-- **Tags:** `1.0.2`, `1.0`, `latest`
+- **Tags:** `1.0.4`, `1.0`, `latest`
 - **Platforms:** `linux/amd64`, `linux/arm64`
 - **Base:** multi-stage [Wolfi](https://github.com/wolfi-dev), digest-pinned;
   compilers exist only in the builder stage

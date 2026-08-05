@@ -1,0 +1,209 @@
+# tns-mirror — the whole thing in one file: sync, database, HTTP API, gateway.
+#
+#   docker compose -f docker-compose.full.yml up -d
+#
+# Same shape as docker-compose.minimal.yml, with keyed HTTP access on top. No
+# override files: everything is here, so there is one place to look and no
+# merge semantics to reason about.
+#
+#     127.0.0.1:8080  gateway ──► api        capped tier  60/min, 1000 rows, 1°
+#                             └─► api-batch  loader tier  unlimited, whole sky
+#
+#     server ──► db ◄── both api containers, through a read-only role
+#
+# Consumers all use ONE url. Their X-API-Key picks the tier, so a project is
+# promoted, demoted or revoked by editing nginx/tns-api-keys.map and reloading.
+#
+# ── FIVE VALUES TO EDIT, then three commands ───────────────────────────────
+#
+# Put them in a .env beside this file, or edit the defaults inline — both
+# work, and .env wins. Anything still saying CHANGE-ME is not yet configured.
+#
+#   POSTGRES_PASSWORD    openssl rand -base64 24
+#   TNS_RO_PASSWORD      openssl rand -base64 24     (a different one)
+#   TNS_API_KEY  \
+#   TNS_BOT_ID    ├─ Bot Management, https://www.wis-tns.org/
+#   TNS_BOT_NAME /
+#
+#   1.  cp nginx/tns-api-keys.map.example nginx/tns-api-keys.map
+#       chmod 600 nginx/tns-api-keys.map        # then put real keys in it
+#       openssl rand -hex 20                    # one key per consumer
+#
+#   2.  docker compose -f docker-compose.full.yml up -d
+#
+#   3.  Create the read-only role the api containers log in as. They restart
+#       until it exists, so this can happen after the stack is up — but until
+#       it does, the API is down and the gateway answers 502:
+#
+#         docker compose -f docker-compose.full.yml exec server \
+#             tns-mirror-server print-grants --database tnsdb > grants.sql
+#         docker compose -f docker-compose.full.yml exec -T db \
+#             psql -U tns_writer -d tnsdb -v pw="$TNS_RO_PASSWORD" -f - < grants.sql
+#
+# Check it:
+#
+#   curl -H "X-API-Key: <a key from your map>" \
+#     'http://127.0.0.1:8080/tns-mirror/api/v1/cone?ra=203.1&dec=10.2&radius_arcsec=60'
+#
+# Hand nginx/handoff.conf to whoever runs the outer reverse proxy. That is the
+# entire integration, and it never needs editing again.
+
+name: tns-mirror
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tnsdb}
+      POSTGRES_USER: ${POSTGRES_USER:-tns_writer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE-ME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Not decoration: nothing here retries a database that is not up yet, so
+    # the `depends_on` conditions below need something to wait for.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tns_writer} -d ${POSTGRES_DB:-tnsdb}"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+    # Deliberately no `ports`. The database is not an internet-facing service,
+    # and everything that needs it is on this network.
+
+  # The only writer. Downloads from TNS and owns the schema.
+  server:
+    image: sarhatabaot/tns-mirror-server:${TNS_MIRROR_VERSION:-1.0.4}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TNS_AUTH_MODE: ${TNS_AUTH_MODE:-bot}
+      TNS_API_KEY: ${TNS_API_KEY:-}
+      TNS_BOT_ID: ${TNS_BOT_ID:-}
+      TNS_BOT_NAME: ${TNS_BOT_NAME:-}
+
+      # Discrete variables rather than a URL: a generated password often
+      # contains '/' or '@', and both change how a URL parses.
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-tns_writer}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-CHANGE-ME}
+      PGDATABASE: ${POSTGRES_DB:-tnsdb}
+    volumes:
+      - workdir:/var/lib/tns-mirror
+    restart: unless-stopped
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+
+  # ── capped tier ───────────────────────────────────────────────────────────
+  # What everyone gets unless their key says otherwise.
+  api:
+    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.4}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # The reader, not the writer. If this container is ever compromised, the
+      # role it holds can SELECT two tables and nothing else — which is why it
+      # is a separate container from the sync server.
+      PGHOST: db
+      PGUSER: ${TNS_RO_USER:-tns_ro}
+      PGPASSWORD: ${TNS_RO_PASSWORD:-CHANGE-ME}
+      PGDATABASE: ${POSTGRES_DB:-tnsdb}
+
+      # Must match the path the outer proxy serves, on BOTH api containers.
+      TNS_API_ROOT_PATH: ${TNS_API_ROOT_PATH:-/tns-mirror/api}
+
+      # Rate limiting is the gateway's job, where the identity is the API key
+      # rather than an address. This is only a backstop for something that
+      # reaches the container without passing through it.
+      TNS_API_RATE_LIMIT: ${TNS_API_RATE_LIMIT:-600}
+
+      # Nothing here has to trust X-Forwarded-For any more: the gateway
+      # identifies callers by key, and that header arrives from a proxy this
+      # stack does not control.
+      TNS_API_TRUST_PROXY: "false"
+    restart: unless-stopped
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    # Deliberately no `ports`. Publishing 8000 would be a route around the key
+    # check — the outer proxy could be pointed straight at it.
+
+  # ── loader tier ───────────────────────────────────────────────────────────
+  # Same image, same read-only role: nothing here reaches further into the
+  # database. It only lifts ceilings that exist to stop one caller
+  # monopolising a shared service.
+  #
+  # A separate container rather than a per-key exemption because the ceiling
+  # that actually binds a loader is the connection pool, and a pool cannot be
+  # divided per caller. Separate containers cannot starve each other.
+  api-batch:
+    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.4}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${TNS_RO_USER:-tns_ro}
+      PGPASSWORD: ${TNS_RO_PASSWORD:-CHANGE-ME}
+      PGDATABASE: ${POSTGRES_DB:-tnsdb}
+
+      # The SAME prefix as the capped tier. Both answer on one URL and the
+      # gateway chooses between them, so a project changes tier without
+      # changing anything it sends.
+      TNS_API_ROOT_PATH: ${TNS_API_ROOT_PATH:-/tns-mirror/api}
+
+      TNS_API_RATE_LIMIT: ${TNS_API_BATCH_RATE_LIMIT:-1000000}
+      TNS_API_TRUST_PROXY: "false"
+
+      # The ceilings a bulk consumer actually hits. Both are clamps, not
+      # errors: at the defaults a request for 5000 rows returns exactly 1000
+      # with nothing to say it was truncated.
+      #
+      # 648000" is 180 degrees, the whole sky. That path is correct — the
+      # client's bounding box has an explicit branch for radius >= 90 degrees
+      # and separation is haversine — but it is a full scan and a sort, so
+      # treat it as a bulk pull rather than a cone search.
+      TNS_API_MAX_RADIUS_ARCSEC: ${TNS_API_BATCH_MAX_RADIUS_ARCSEC:-648000}
+      TNS_API_MAX_LIMIT: ${TNS_API_BATCH_MAX_LIMIT:-200000}
+
+      # Its own pool. Raising this buys parallelism, but both tiers and the
+      # sync server all draw on Postgres max_connections (default 100).
+      TNS_API_POOL_MIN: ${TNS_API_BATCH_POOL_MIN:-1}
+      TNS_API_POOL_MAX: ${TNS_API_BATCH_POOL_MAX:-10}
+    restart: unless-stopped
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+
+  # ── gateway ───────────────────────────────────────────────────────────────
+  # Authenticates every caller by API key and picks the tier from the key's
+  # name. The only published port in the stack.
+  gateway:
+    image: nginx:1.27-alpine
+    # Started, not healthy: if the reader role does not exist yet the api
+    # containers are still restarting, and the gateway should come up anyway
+    # and say 502 rather than silently never starting.
+    depends_on: [api, api-batch]
+    ports:
+      # Loopback. The outer reverse proxy runs on this host and is the only
+      # route in from anywhere else.
+      - "${TNS_GATEWAY_BIND:-127.0.0.1:8080}:80"
+    volumes:
+      - ./nginx/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+      # nginx will not start if this is missing, which is the behaviour you
+      # want: no key file, no access, rather than an open door.
+      - ./nginx/tns-api-keys.map:/etc/nginx/tns-api-keys.map:ro
+    restart: unless-stopped
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    # The master process needs these writable and creates what it needs in
+    # them at startup. Workers drop to the unprivileged 'nginx' user already.
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+
+volumes:
+  pgdata:
+  workdir:

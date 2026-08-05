@@ -10,7 +10,74 @@ schema change bumps the major on both.
 
 ## [Unreleased]
 
-## [Unreleased]
+## [1.0.4] — 2026-08-05
+
+Ships the optional HTTP API, which 1.0.3 was meant to and did not: that tag was
+cut while every file still said 1.0.2, so the release verified and stopped
+before publishing anything. **1.0.3 does not exist on PyPI or Docker Hub** —
+nothing was published under it, and the tag is left in place only so it is not
+reused. Go from 1.0.2 to 1.0.4.
+
+Schema is **unchanged at v1**. Nothing here touches the contract, so a consumer
+pinning `tns-mirror-client>=1,<2` needs no action.
+
+### Changed — one file to bump
+
+- **`VERSION` at the repository root is now the source of the project version**,
+  and the other seven files are derived from it:
+
+      echo 1.0.5 > VERSION
+      python3 scripts/check_versions.py --write
+
+  Same shape as `render_schema.py` → `schema_v1.sql`: one source, a generator,
+  CI failing on drift. The derived files keep literals rather than importing a
+  shared module because the images build with a **narrow context** — `server/`
+  and `api/`, not the repository root — so nothing inside them can read a
+  top-level file at build time. Each artifact stays self-contained.
+- The check now compares every file against `VERSION` rather than only against
+  each other, so it names the file that drifted instead of reporting only that
+  they disagree. It also covers the image tags pinned in the compose files and
+  documentation, which previously drifted silently and left the quickstart
+  telling people to pull a superseded image.
+- `SCHEMA_VERSION` is deliberately **not** derived. It changes on its own rare,
+  deliberate occasions, and a major bump without a schema change is exactly the
+  mistake the major-equals-schema rule exists to catch.
+- The pre-commit hook's file pattern did not include `VERSION`, so editing only
+  the source file would not have run the check.
+
+### Added — keyed, tiered HTTP access (deployment recipe)
+
+For deployments where the outer reverse proxy belongs to someone else, and
+access has to be granted, revoked and metered without involving them.
+
+- **`quickstart/docker-compose.api-gateway.yml`** adds a small nginx gateway and
+  a second API container in front of the mirror. An `X-API-Key` maps to a
+  consumer name, the name selects a tier, and each tier is its own container
+  with its own pool and ceilings. Every consumer uses one URL; changing a
+  consumer's tier changes nothing they send.
+- **Nothing outside the stack holds a key.** `quickstart/nginx/handoff.conf` is
+  the entire integration handed to whoever runs the outer proxy: one `location`
+  pointing at loopback, which never needs editing again — not to add a consumer,
+  rotate a key, or change a limit.
+- **Rate limiting keys on the API key, not the address.** Two projects behind one
+  NAT get separate budgets and one project across a cluster shares a single
+  budget, neither of which an address-based limit can express. It also removes
+  any need to trust `X-Forwarded-For`, which is why the API containers now set
+  `TNS_API_TRUST_PROXY=false` in this configuration.
+- The API itself is **unchanged**: no key handling in a published image, which
+  keeps its one secret the read-only DSN. The gateway logs each consumer's name
+  and never the key.
+- The capped tier's API port is not published when the gateway is in use, so
+  there is no route around the key check.
+
+### Fixed — documentation
+
+- The reverse-proxy examples set `X-Forwarded-For` with
+  `$proxy_add_x_forwarded_for`, which **appends** to whatever the client sent.
+  The limiter charges the left-most entry, so at the edge a caller could keep
+  that slot and mint a fresh bucket per request — defeating the point of
+  `TNS_API_TRUST_PROXY`. Now `$remote_addr`, with a note on when appending is
+  correct.
 
 ### Added — `tns-mirror-api` (Docker Hub, optional)
 
@@ -259,7 +326,8 @@ Several points were under-specified in the design document and resolved here:
 - **Cone search is not in the server.** It belongs to the client; the server only
   owns the `(ra, dec)` index, which is DDL and therefore contract.
 
-[Unreleased]: https://github.com/sarhatabaot/tns-mirror/compare/1.0.2...HEAD
+[Unreleased]: https://github.com/sarhatabaot/tns-mirror/compare/1.0.4...HEAD
+[1.0.4]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.4
 [1.0.2]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.2
 [1.0.1]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.1
 [1.0.0]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.0

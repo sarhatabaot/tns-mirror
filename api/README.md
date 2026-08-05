@@ -74,7 +74,10 @@ Set it when your proxy **passes the prefix through**:
 ```nginx
 location /tns/ {
     proxy_pass http://tns-api:8000/tns/;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # $remote_addr, not $proxy_add_x_forwarded_for, when this nginx is the
+    # edge: the limiter charges the left-most entry, and appending leaves
+    # that slot caller-controlled.
+    proxy_set_header X-Forwarded-For $remote_addr;
 }
 ```
 
@@ -96,7 +99,7 @@ would not stop a single enormous query.
 ```console
 $ docker run --rm -p 8000:8000 \
     -e PGHOST=your-db -e PGUSER=tns_ro -e PGPASSWORD=... -e PGDATABASE=tnsdb \
-    sarhatabaot/tns-mirror-api:1.0.2
+    sarhatabaot/tns-mirror-api:1.0.4
 ```
 
 Use the `tns_ro` credentials from `tns-mirror-server print-grants`, never the

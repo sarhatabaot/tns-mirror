@@ -57,6 +57,22 @@ database driver and a scheduler, not Django.
    type or unit change) → major, in lockstep with the client, announced in
    `CHANGELOG.md`.
 
+## Changing the version
+
+1. Edit `VERSION` at the repository root. That is the only file you edit.
+2. Run `python3 scripts/check_versions.py --write` to propagate it into the
+   seven derived files and the image tags pinned across the compose files and
+   documentation. CI and pre-commit fail if any of them drift.
+
+The derived files hold literals rather than reading `VERSION` at runtime
+because the images build with a **narrow context** — `server/` and `api/`, not
+the repository root — so nothing inside them can reach a file at the top level.
+Each artifact stays self-contained; the script keeps them agreeing.
+
+**The major version is the schema version**, so `SCHEMA_VERSION` is deliberately
+not derived from `VERSION`; the check enforces that they match. Tags are bare
+(`1.0.4`, not `v1.0.4`).
+
 ## Conventions
 
 - Python ≥ 3.13, uv, hatchling, ruff (lint + format).
