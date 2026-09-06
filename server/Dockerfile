@@ -8,7 +8,7 @@
 # sidecar, never baked in here.
 
 # --- builder ----------------------------------------------------------------
-FROM cgr.dev/chainguard/wolfi-base@sha256:003627df3c1e1bba0c4116afcddb314aca9594ee2328c7e876a8081a6c988b2e AS builder
+FROM cgr.dev/chainguard/wolfi-base@sha256:918a593b8268c222afd4e2c4f06860ac984e60719b4697e4c71d796bc8fcd042 AS builder
 
 # hadolint ignore=DL3018
 RUN apk add --no-cache python-3.13 python-3.13-dev py3.13-pip build-base
@@ -35,7 +35,7 @@ COPY src/ ./src/
 RUN uv sync --frozen --no-dev --no-editable
 
 # --- runtime ----------------------------------------------------------------
-FROM cgr.dev/chainguard/wolfi-base@sha256:003627df3c1e1bba0c4116afcddb314aca9594ee2328c7e876a8081a6c988b2e AS runtime
+FROM cgr.dev/chainguard/wolfi-base@sha256:918a593b8268c222afd4e2c4f06860ac984e60719b4697e4c71d796bc8fcd042 AS runtime
 
 # tzdata is not optional here: everything this service schedules is in UTC, and
 # without the zone database psycopg cannot resolve the server's timezone.
