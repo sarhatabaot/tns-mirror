@@ -7,7 +7,7 @@
 # and it connects with the read-only role.
 
 # --- builder ----------------------------------------------------------------
-FROM cgr.dev/chainguard/wolfi-base@sha256:003627df3c1e1bba0c4116afcddb314aca9594ee2328c7e876a8081a6c988b2e AS builder
+FROM cgr.dev/chainguard/wolfi-base@sha256:360896efb0753a5701c48f860e17130c205eae5a264797aa3e7ea126ee2923a7 AS builder
 
 # hadolint ignore=DL3018
 RUN apk add --no-cache python-3.13 python-3.13-dev py3.13-pip build-base
@@ -31,7 +31,7 @@ COPY src/ ./src/
 RUN uv sync --frozen --no-dev --no-editable
 
 # --- runtime ----------------------------------------------------------------
-FROM cgr.dev/chainguard/wolfi-base@sha256:003627df3c1e1bba0c4116afcddb314aca9594ee2328c7e876a8081a6c988b2e AS runtime
+FROM cgr.dev/chainguard/wolfi-base@sha256:360896efb0753a5701c48f860e17130c205eae5a264797aa3e7ea126ee2923a7 AS runtime
 
 # tzdata: psycopg resolves the server timezone, and everything here is UTC.
 # hadolint ignore=DL3018
