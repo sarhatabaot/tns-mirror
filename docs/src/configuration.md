@@ -32,8 +32,7 @@ is no anonymous fallback.
 That applies to the commands that *download* — `sync`, `catch-up` and `serve`,
 each of which refuses at startup rather than partway through. `migrate`,
 `status` and `print-grants` never contact TNS and work without a credential, so
-you can create the schema and hand out a read-only role before you have a TNS
-account.
+you can create the schema and hand out a read-only role before you have a credential.
 
 | Setting | Environment | Default |
 |---|---|---|
@@ -43,7 +42,7 @@ account.
 | `auth.bot_id` | `TNS_BOT_ID` | — required in `bot` mode |
 | `auth.bot_name` | `TNS_BOT_NAME` | — required in `bot` mode |
 
-`marker` sends your registered User-Agent on a `GET`. `bot` submits the `api_key`
+`marker` sends your `tns_marker` User-Agent on a `GET`: a registered user's, or the `guest` form, which needs no TNS account. `bot` submits the `api_key`
 as form data on a `POST`, alongside a marker naming the bot.
 
 ## Download
@@ -125,7 +124,7 @@ auth:
   user_agent: ${TNS_USER_AGENT}
 
 download:
-  url: https://www.wis-tns.org/system/files/tns_public_objects/tns_public_objects.csv.zip
+  url: https://www.wis-tns.org/sites/default/files/tns_public_objects/tns_public_objects.csv.zip
   timeout_seconds: 120
   throttle_seconds: 10
   workdir: /var/lib/tns-mirror

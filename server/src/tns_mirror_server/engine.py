@@ -1,12 +1,12 @@
 """The sync engine: provider-agnostic, no I/O of its own.
 
-Design §5 and A.2. Everything here is expressed against the ``Source`` and
+Everything here is expressed against the ``Source`` and
 ``Store`` ports, so the whole engine is exercised in tests with an in-memory
 store and a fake source — no network, no database.
 
 Deliberately *not* here: cone search, cross-matching, or anything that decides
 what a TNS name means. The server keeps the catalogue current; interpreting it is
-the client's job (design §10, and "What does NOT come across" in A.6).
+the client's job.
 """
 
 from __future__ import annotations

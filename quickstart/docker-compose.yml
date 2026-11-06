@@ -49,19 +49,21 @@ services:
       # │                                                                   │
       # │ The mirror never downloads anonymously: leave both blank and the  │
       # │ server stops with a clear message rather than hammering TNS as an │
-      # │ unknown client. Register free at https://www.wis-tns.org/         │
+      # │ unknown client. A marker needs no TNS account.                    │
       # └───────────────────────────────────────────────────────────────────┘
 
       TNS_AUTH_MODE: ${TNS_AUTH_MODE:-marker}
 
       # ── Mode "marker" — one value. Keep the single quotes. ──
       TNS_USER_AGENT: ${TNS_USER_AGENT:-}
-      #   TNS_USER_AGENT: 'tns_marker{"tns_id":"1234","type":"user","name":"your_username"}'
+      #   With no TNS account, use your full name:
+      #   TNS_USER_AGENT: 'tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}'
+      #   With one, use your id and username:
+      #   TNS_USER_AGENT: 'tns_marker{"tns_id":1234,"type":"user","name":"your_username"}'
 
       # ── Mode "bot" — set TNS_AUTH_MODE to "bot" above, then ALL THREE of
-      #    these. A bot's api_key alone is not enough: the key authenticates
-      #    the request and the id and name identify which bot is asking, so
-      #    the server refuses unless all three are present. ──
+      #    these. A bot's api_key alone is not enough: the server refuses
+      #    unless all three are present. ──
       TNS_API_KEY: ${TNS_API_KEY:-}
       TNS_BOT_ID: ${TNS_BOT_ID:-}
       TNS_BOT_NAME: ${TNS_BOT_NAME:-}

@@ -20,14 +20,11 @@ with no rate-limited API on your hot path.
 
 ## You need a TNS credential
 
-**The mirror never downloads anonymously.** TNS access is per-account, and with no
-credential the server stops with a message rather than hammering TNS as an
-unknown client. This image ships with no TNS identity — a `tns_marker` or bot
-`api_key` identifies a *specific account*, so each deployer supplies their own.
+**The mirror never downloads anonymously.** TNS requires a `tns_marker` on every download, and with no credential the server stops with a message rather than hammering TNS as an unknown client. This image ships with no TNS identity — a `tns_marker` or bot `api_key` identifies a *specific person or account*, so each deployer supplies their own.
 
-Register free at [wis-tns.org](https://www.wis-tns.org/), then use either:
+Use either:
 
-- **Marker** — your account's `tns_marker` User-Agent, sent on a `GET`. Simplest.
+- **Marker** — a `tns_marker` User-Agent, sent on a `GET`. Simplest. It needs no account: `tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}`.
 - **Bot** — create one under *Bot Management*; its `api_key` is submitted as form
   data on a `POST`.
 
@@ -53,13 +50,13 @@ services:
     restart: unless-stopped
 
   server:
-    image: sarhatabaot/tns-mirror-server:1.0.4
+    image: sarhatabaot/tns-mirror-server:1.0.5
     depends_on:
       db:
         condition: service_healthy
     environment:
       # Your TNS marker, keeping the single quotes.
-      TNS_USER_AGENT: 'tns_marker{"tns_id":"1234","type":"user","name":"your_username"}'
+      TNS_USER_AGENT: 'tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}'
       # Discrete PG* variables rather than a URL: a generated password often
       # contains '/' or '@', either of which changes how a URL parses.
       PGHOST: db
@@ -219,7 +216,7 @@ cross-matching, no HTTP API — querying the catalogue belongs to the consumer, 
 
 ## Image
 
-- **Tags:** `1.0.4`, `1.0`, `latest`
+- **Tags:** `1.0.5`, `1.0`, `latest`
 - **Platforms:** `linux/amd64`, `linux/arm64`
 - **Base:** multi-stage [Wolfi](https://github.com/wolfi-dev), with a digest-pinned base and version-pinned packages; no compiler in any stage
 - **User:** non-root, uid `10001`

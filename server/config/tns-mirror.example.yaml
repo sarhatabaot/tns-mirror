@@ -11,7 +11,7 @@
 source: tns
 
 auth:
-  # "marker" — a registered TNS account's tns_marker User-Agent (a GET).
+  # "marker" — a tns_marker User-Agent (a GET). Needs no TNS account.
   # "bot"    — a TNS bot's api_key submitted as form data (a POST).
   # With neither configured the server refuses to download; there is no
   # anonymous fallback.
@@ -22,7 +22,7 @@ auth:
   # bot_name: ${TNS_BOT_NAME}
 
 download:
-  url: https://www.wis-tns.org/system/files/tns_public_objects/tns_public_objects.csv.zip
+  url: https://www.wis-tns.org/sites/default/files/tns_public_objects/tns_public_objects.csv.zip
   timeout_seconds: 120
   # Seconds between consecutive downloads during catch-up. TNS rate-limits; a
   # 429 stops catch-up early rather than hammering it.

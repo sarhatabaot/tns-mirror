@@ -1,11 +1,11 @@
 """A small UTC cron scheduler for the ``serve`` command.
 
-Design §5.4. One-shot commands are the primitive; this is the thin wrapper that
+One-shot commands are the primitive; this is the thin wrapper that
 turns them into a long-lived process for ``docker compose up``. Kubernetes
 deployments run CronJobs against the one-shot commands and never load this.
 
 Cron parsing is implemented here rather than taken as a dependency: the subset
-needed is small, and §8 asks for a small dependency tree because every dependency
+needed is small, and the dependency tree stays small because every dependency
 is attack surface in a published image.
 
 Schedules are evaluated in **UTC**, because TNS stages its hourly files on UT

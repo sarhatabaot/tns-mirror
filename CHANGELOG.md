@@ -10,15 +10,24 @@ schema change bumps the major on both.
 
 ## [Unreleased]
 
-### Fixed
+## [1.0.5] — 2026-11-06
 
-- **Image builds failed** because Python came from Wolfi's rolling repository while the base image stayed pinned, so Python began to require a newer glibc than the base had. The base digest is updated, and every `apk` package in both images is now pinned to an exact version, transitive ones included, so the two cannot drift apart.
+Upgrade from 1.0.4 now: TNS rejects the download path that 1.0.4 uses by default, so its syncs fail. Schema is **unchanged at v1**.
 
 ### Changed
 
+- **The default download URL moved to `/sites/default/files/`**, following [TNS AstroNote 2026-315](https://www.wis-tns.org/astronotes/astronote/2026-315). The filenames are unchanged. TNS now answers the old `/system/files/` path with HTTP 401 in both auth modes. **If you set `download.url` or `TNS_URL` yourself, update it:** `https://www.wis-tns.org/sites/default/files/tns_public_objects/tns_public_objects.csv.zip`.
+- A 401 or 403 from the old path now says the path moved, instead of blaming the credentials.
+- The documentation no longer says a TNS account is required. TNS accepts a `guest` `tns_marker` carrying your full name on these files. The mirror still refuses to download with no marker or bot credentials.
+- **A guest marker is now the default in every quickstart.** `docker-compose.minimal.yml` and `docker-compose.full.yml` default to marker mode instead of bot mode. A bot remains optional: set `TNS_AUTH_MODE=bot` and its three credentials.
 - No image stage installs a compiler any more, because every dependency has a prebuilt wheel.
 - The builder copies `uv` from Astral's image, pinned by version and digest, instead of installing it with pip, so it no longer needs pip.
 - Bytecode is compiled at build time, so processes no longer recompile on each start. This adds about 4 MB to the server image and 34 MB to the API image.
+
+### Fixed
+
+- `docker-compose.minimal.yml` and `docker-compose.full.yml` never passed `TNS_USER_AGENT` to the server, so a marker set in `.env` was ignored and the download refused.
+- **Image builds failed** because Python came from Wolfi's rolling repository while the base image stayed pinned, so Python began to require a newer glibc than the base had. The base digest is updated, and every `apk` package in both images is now pinned to an exact version, transitive ones included, so the two cannot drift apart.
 
 ### Security
 
@@ -340,7 +349,8 @@ Several points were under-specified in the design document and resolved here:
 - **Cone search is not in the server.** It belongs to the client; the server only
   owns the `(ra, dec)` index, which is DDL and therefore contract.
 
-[Unreleased]: https://github.com/sarhatabaot/tns-mirror/compare/1.0.4...HEAD
+[Unreleased]: https://github.com/sarhatabaot/tns-mirror/compare/1.0.5...HEAD
+[1.0.5]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.5
 [1.0.4]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.4
 [1.0.2]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.2
 [1.0.1]: https://github.com/sarhatabaot/tns-mirror/releases/tag/1.0.1

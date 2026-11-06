@@ -35,9 +35,7 @@ the sync server's write credentials stay unexposed.
 
 ## Quick start
 
-You need a TNS account, because **the mirror never downloads anonymously**.
-Register at [wis-tns.org](https://www.wis-tns.org/), then either note your
-`tns_marker` User-Agent or create a bot under your profile's Bot Management.
+You need a `tns_marker` User-Agent, because **the mirror never downloads anonymously**. It doesn't need a TNS account: [TNS accepts a `guest` marker](https://www.wis-tns.org/astronotes/astronote/2026-315) carrying your full name.
 
 Grab [`quickstart/docker-compose.yml`](quickstart/docker-compose.yml), change
 the two marked lines — a database password and your TNS credential — and:
@@ -163,13 +161,10 @@ and [`server/.env.example`](server/.env.example).
 
 ### Two ways to authenticate
 
-TNS access is per-account, and the mirror supports both mechanisms so you can use
-whichever your registration gives you:
+TNS's public files no longer need an account or bot credentials, only a `tns_marker` User-Agent. The mirror supports both mechanisms:
 
-- **`marker`** — a registered account's `tns_marker{...}` User-Agent, sent on a
-  `GET`. Simplest.
-- **`bot`** — a TNS bot's `api_key`, submitted as form data on a `POST`,
-  alongside a marker naming the bot.
+- **`marker`** — a `tns_marker{...}` User-Agent, sent on a `GET`: a registered user's, or the `guest` form. Simplest.
+- **`bot`** — a TNS bot's `api_key`, submitted as form data on a `POST`, alongside a marker naming the bot.
 
 They differ in HTTP verb, not just in headers. **With neither configured the
 download refuses** rather than falling back to an anonymous request.
@@ -177,7 +172,7 @@ download refuses** rather than falling back to an anonymous request.
 ## Security
 
 - **No baked identity.** The image ships with no TNS credential. A `tns_marker`
-  and a bot `api_key` identify a *specific account*; each deployer supplies their
+  and a bot `api_key` identify a *specific person or account*; each deployer supplies their
   own. `.env.example` contains only obvious placeholders.
 - **Split credentials.** The server holds write access to its own database.
   Consumers get a distinct read-only role with `SELECT` on two tables and nothing
@@ -287,11 +282,10 @@ the mirror's to license**.
 
 ## Releases
 
-One tag ships both artifacts, from one CI run, so the published pair is always a
-combination that was tested together:
+One tag ships every artifact, from one CI run, so the published set is always a combination that was tested together:
 
 ```console
-$ git tag 1.0.1 && git push origin 1.0.1
+$ git tag X.Y.Z && git push origin X.Y.Z
 ```
 
 - `sarhatabaot/tns-mirror-server` → Docker Hub (multi-arch, with provenance and
@@ -314,7 +308,7 @@ which is the thing consumers actually depend on.
 
 | Change | Bump |
 |---|---|
-| Rename or drop a column, change a type or a unit | **major**, both artifacts |
+| Rename or drop a column, change a type or a unit | **major**, all artifacts |
 | New nullable column, new index, new feature | minor |
 | Fixes | patch |
 

@@ -1,4 +1,4 @@
-# Publish a GitHub Release, ship both artifacts.
+# Publish a GitHub Release, ship every artifact.
 #
 #   server  ->  Docker Hub   (sarhatabaot/tns-mirror-server)
 #   api     ->  Docker Hub   (sarhatabaot/tns-mirror-api)     — optional service
@@ -17,8 +17,8 @@
 # To cut a release: tag the commit, then publish a Release from that tag on
 # GitHub. Publishing the Release is what triggers this.
 #
-#   git tag 1.0.1 && git push origin 1.0.1
-#   gh release create 1.0.1 --generate-notes
+#   git tag X.Y.Z && git push origin X.Y.Z
+#   gh release create X.Y.Z --generate-notes
 #
 # Both artifacts carry one version, and **the major version is the schema
 # version**: v1.x.y speaks schema v1. A consumer pinning

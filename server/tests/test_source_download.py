@@ -1,6 +1,6 @@
 """Download happy path and failure modes.
 
-Design §11 calls this out explicitly as the gap in the original implementation's
+This was the gap in the original implementation's
 coverage: stream -> zip extract -> atomic swap was never tested end to end.
 """
 
@@ -39,7 +39,10 @@ def test_hourly_delta_rewrites_url_and_filenames(tmp_path):
 
     csv_path = source.download(hour=7)
 
-    assert session.calls[0]["url"].endswith("tns_public_objects_07.csv.zip")
+    assert session.calls[0]["url"] == (
+        "https://www.wis-tns.org/sites/default/files/tns_public_objects/"
+        "tns_public_objects_07.csv.zip"
+    )
     assert csv_path == tmp_path / "tns_public_objects_07.csv"
     assert (tmp_path / "tns_public_objects_07.csv.zip").exists()
 

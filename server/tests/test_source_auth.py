@@ -1,4 +1,4 @@
-"""Invariant 4: authenticated to TNS, or no download at all.
+"""Invariant 4: identified to TNS, or no download at all.
 
 Both credential paths are covered, including the fact that they differ in HTTP
 verb — the bot path submits its ``api_key`` as form data on a POST.
@@ -27,6 +27,19 @@ def test_marker_mode_sends_the_user_agent_on_a_get(tmp_path):
     assert call["method"] == "GET"
     assert call["headers"]["User-Agent"] == MARKER
     assert call["data"] is None  # nothing to submit
+
+
+def test_guest_marker_needs_no_account_and_is_sent_on_a_get(tmp_path):
+    guest = 'tns_marker{"tns_id":0,"type":"guest","name":"Test Person"}'
+    session = FakeSession(FakeResponse(zip_bytes("objid,name,ra,dec\n1,AT1,1.0,2.0\n")))
+    source = TnsPublicObjects(make_config(tmp_path, user_agent=guest), session=session)
+
+    source.download()
+
+    (call,) = session.calls
+    assert call["method"] == "GET"
+    assert call["headers"]["User-Agent"] == guest
+    assert call["data"] is None
 
 
 def test_bot_mode_posts_the_api_key_and_identifies_the_bot(tmp_path):
@@ -122,3 +135,18 @@ def test_429_stays_an_httperror_for_the_engine_to_classify(tmp_path):
 
     with pytest.raises(requests.HTTPError):
         source.download()
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_a_rejection_on_the_old_path_says_the_path_moved(tmp_path, status):
+    old = "https://www.wis-tns.org/system/files/tns_public_objects/tns_public_objects.csv.zip"
+    session = FakeSession(FakeResponse(b"", status=status, url=old))
+    source = TnsPublicObjects(make_config(tmp_path, user_agent=MARKER), session=session)
+
+    with pytest.raises(SourceError) as excinfo:
+        source.download()
+
+    message = str(excinfo.value)
+    assert "/sites/default/files/" in message
+    assert "TNS_URL" in message
+    assert "rejected the marker" not in message

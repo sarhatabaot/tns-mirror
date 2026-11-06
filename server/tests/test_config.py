@@ -157,7 +157,7 @@ def test_catchup_window_must_fit_in_a_day():
 
 def test_credentials_are_redacted_from_repr():
     # A traceback or a debug log must not be able to leak a TNS api_key or a DSN
-    # password (design §7).
+    # password.
     config = Config(
         auth=AuthConfig(mode="bot", api_key="super-secret-key", bot_id="1", bot_name="b"),
         database=DatabaseConfig(dsn="postgresql://user:hunter2@db/tnsdb"),
@@ -170,3 +170,11 @@ def test_credentials_are_redacted_from_repr():
     assert "hunter2" not in rendered
     assert "***" in rendered
     assert "mode='bot'" in rendered  # non-secret fields stay useful
+
+
+def test_default_download_url_is_the_path_from_astronote_2026_315():
+    config = load_config(None, BASE_ENV)
+    assert config.download.url == (
+        "https://www.wis-tns.org/sites/default/files/tns_public_objects/"
+        "tns_public_objects.csv.zip"
+    )

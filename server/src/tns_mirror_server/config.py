@@ -1,13 +1,13 @@
 """Configuration: one YAML file, every value env-overridable.
 
-Design §6 and A.5. Precedence, lowest to highest:
+Precedence, lowest to highest:
 
     built-in defaults  <  config file  <  environment
 
 Credentials (the TNS marker, the bot ``api_key``, the database DSN) are
 *operator-supplied* and never baked into the image or committed. The dataclasses
 below redact them from ``repr()`` so a stray log line or traceback cannot leak
-one (§7).
+one.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 DEFAULT_URL: Final = (
-    "https://www.wis-tns.org/system/files/tns_public_objects/tns_public_objects.csv.zip"
+    "https://www.wis-tns.org/sites/default/files/tns_public_objects/tns_public_objects.csv.zip"
 )
 DEFAULT_WORKDIR: Final = "/var/lib/tns-mirror"
 FULL_SNAPSHOT_FILENAME: Final = "tns_public_objects.csv.zip"
@@ -98,8 +98,9 @@ class AuthConfig:
     """TNS credentials. Exactly one mode is active; neither configured is fatal.
 
     ``marker``
-        A registered ``tns_marker{...}`` User-Agent on a plain GET. The simplest
-        path, and what most TNS accounts have.
+        A ``tns_marker{...}`` User-Agent on a plain GET: a registered user's, or
+        the ``guest`` form TNS accepts from someone with no account. The simplest
+        path.
 
     ``bot``
         A TNS bot: the file is requested with ``api_key`` submitted as form data
@@ -113,7 +114,7 @@ class AuthConfig:
     bot_id: str = ""
     bot_name: str = ""
 
-    def __repr__(self) -> str:  # pragma: no cover - trivial, but load-bearing for §7
+    def __repr__(self) -> str:  # pragma: no cover - trivial, but load-bearing
         return (
             f"AuthConfig(mode={self.mode!r}, "
             f"user_agent={_REDACTED if self.user_agent else ''!r}, "
@@ -122,12 +123,12 @@ class AuthConfig:
         )
 
     def validate(self) -> None:
-        """Enforce invariant 4: authenticated to TNS, or refuse to download."""
+        """Enforce invariant 4: identified to TNS, or refuse to download."""
         if self.mode == "marker":
             if not self.user_agent.strip():
                 raise AuthNotConfigured(
                     "auth.mode is 'marker' but auth.user_agent (TNS_USER_AGENT) is empty. "
-                    "Register a TNS account and supply its tns_marker User-Agent; "
+                    "Supply a tns_marker User-Agent, which needs no TNS account; "
                     "tns-mirror never downloads anonymously."
                 )
         elif self.mode == "bot":
@@ -199,7 +200,7 @@ class DatabaseConfig:
 class ScheduleConfig:
     """Used only by ``serve``. Kubernetes deployments use CronJobs and ignore these.
 
-    Three jobs, resolving the design's §5.4-vs-A.6 ambiguity explicitly:
+    Three jobs:
 
     * ``full_cron`` — the daily full snapshot.
     * ``delta_cron`` — the hourly delta (``catchup_hours`` defaults to 1, i.e.
@@ -343,7 +344,7 @@ def load_config(
 
 
 def _apply_env(config: Config, env: Mapping[str, str]) -> Config:
-    """Overlay environment variables (design §6 / A.5). Env always wins."""
+    """Overlay environment variables. Env always wins."""
     auth = config.auth
     if (v := env.get("TNS_AUTH_MODE")) is not None:
         auth = replace(auth, mode=v)

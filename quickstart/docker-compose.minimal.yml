@@ -1,17 +1,20 @@
-# tns-mirror — the smallest thing that works, using a TNS bot.
+# tns-mirror — the smallest thing that works, using a guest tns_marker.
 #
 # Put the values in a .env beside this file, or edit the defaults inline —
 # both work, and .env wins:
 #
 #   docker compose -f docker-compose.minimal.yml up -d
 #
-# There is nothing optional in this file. Every line is either required or the
+# Apart from the optional bot settings, every line is either required or the
 # default; docker-compose.yml is the same thing with the settings you may want
 # to change made visible and explained.
 #
-# Bot credentials come from Bot Management in your TNS profile
-# (https://www.wis-tns.org/). All three are required: the api_key
-# authenticates the request, the id and name identify which bot is asking.
+# Set TNS_USER_AGENT to a marker with your full name, which needs no TNS account:
+#
+#   TNS_USER_AGENT=tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}
+#
+# Bot credentials also work. They come from Bot Management in your TNS profile
+# (https://www.wis-tns.org/), and the server refuses unless all three are set.
 
 name: tns-mirror
 
@@ -32,12 +35,15 @@ services:
       retries: 20
 
   server:
-    image: sarhatabaot/tns-mirror-server:1.0.4
+    image: sarhatabaot/tns-mirror-server:1.0.5
     depends_on:
       db:
         condition: service_healthy
     environment:
-      TNS_AUTH_MODE: ${TNS_AUTH_MODE:-bot}
+      TNS_AUTH_MODE: ${TNS_AUTH_MODE:-marker}
+      TNS_USER_AGENT: ${TNS_USER_AGENT:-}
+      # Optional: to use a bot instead, set TNS_AUTH_MODE to "bot" and all three
+      # of these.
       TNS_API_KEY: ${TNS_API_KEY:-}
       TNS_BOT_ID: ${TNS_BOT_ID:-}
       TNS_BOT_NAME: ${TNS_BOT_NAME:-}

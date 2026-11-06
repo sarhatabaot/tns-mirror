@@ -34,7 +34,7 @@ summary: A self-hostable mirror of the TNS public objects catalogue, in SQL.
     <p class="card__eyebrow">Server</p>
     <h3><a href="{{ '/quickstart/' | url }}">I want to run a mirror</a></h3>
     <p>
-      You have a TNS account and somewhere to run Docker. Bring up the server
+      You have somewhere to run Docker. Bring up the server
       with a compose file and a <code>.env</code>, and it keeps a Postgres
       database current on its own.
     </p>
@@ -97,7 +97,7 @@ summary: A self-hostable mirror of the TNS public objects catalogue, in SQL.
 <h2 id="in-one-minute">In one minute</h2>
 
 <p>
-  Running a mirror needs a TNS account, because it never downloads anonymously.
+  Running a mirror needs a <code>tns_marker</code>, which doesn't require a TNS account, because it never downloads anonymously.
 </p>
 
 <pre><code>git clone {{ site.repository }}

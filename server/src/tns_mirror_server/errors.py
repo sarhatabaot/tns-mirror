@@ -14,7 +14,7 @@ class ConfigError(TnsMirrorError):
 class AuthNotConfigured(ConfigError):
     """No usable TNS credential.
 
-    Invariant 4: the mirror is authenticated to TNS or it does not download.
+    Invariant 4: the mirror identifies itself to TNS or it does not download.
     There is no anonymous fallback.
     """
 
@@ -28,7 +28,7 @@ class ParseError(SourceError, ValueError):
 
     Subclasses :class:`ValueError` because the engine treats an unparseable
     *delta* as a quiet hour rather than a failure, and that tolerance is
-    expressed by catching ``ValueError`` (design A.2).
+    expressed by catching ``ValueError``.
     """
 
 

@@ -19,7 +19,7 @@ $ tns-mirror-server print-grants --database tnsdb
 ```
 
 See the [repository README](../README.md) for setup, configuration, and the TNS
-credential you must supply. Full design rationale is in `design-tdd.md`.
+credential you must supply.
 
 ## Layout
 
