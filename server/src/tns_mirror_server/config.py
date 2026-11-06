@@ -38,6 +38,13 @@ DEFAULT_URL: Final = (
 DEFAULT_WORKDIR: Final = "/var/lib/tns-mirror"
 FULL_SNAPSHOT_FILENAME: Final = "tns_public_objects.csv.zip"
 
+#: The search page. The pre-2016 SNe are not in any staged file; TNS's own
+#: guidance is to fetch them from here with ``isTNS_AT=no&format=csv``.
+DEFAULT_HISTORIC_URL: Final = "https://www.wis-tns.org/search"
+HISTORIC_FILENAME: Final = "tns_historic_sne.csv"
+#: The documented maximum rows per search-page export.
+HISTORIC_MAX_PAGE_SIZE: Final = 100
+
 #: Unquoted lowercase SQL identifiers only. Config-supplied names reach DDL, so
 #: they are validated here *and* rendered through psycopg's Identifier quoting
 #: at the point of use — belt and braces, so no injection suppression is needed.
@@ -157,13 +164,18 @@ class DownloadConfig:
     timeout_seconds: float = 120.0
     throttle_seconds: float = 10.0
     workdir: Path = Path(DEFAULT_WORKDIR)
+    #: Search page the historic SNe are paged out of, and the rows per page.
+    historic_url: str = DEFAULT_HISTORIC_URL
+    historic_page_size: int = HISTORIC_MAX_PAGE_SIZE
 
     def validate(self) -> None:
-        if not self.url.startswith("https://"):
-            raise ConfigError(
-                f"download.url must be https (TNS credentials must never cross "
-                f"the wire in the clear), got {self.url!r}"
-            )
+        urls = (("download.url", self.url), ("download.historic_url", self.historic_url))
+        for what, url in urls:
+            if not url.startswith("https://"):
+                raise ConfigError(
+                    f"{what} must be https (TNS credentials must never cross "
+                    f"the wire in the clear), got {url!r}"
+                )
         if FULL_SNAPSHOT_FILENAME not in self.url:
             raise ConfigError(
                 f"download.url must end in {FULL_SNAPSHOT_FILENAME!r} — the hourly "
@@ -174,6 +186,11 @@ class DownloadConfig:
             raise ConfigError("download.timeout_seconds must be positive")
         if self.throttle_seconds < 0:
             raise ConfigError("download.throttle_seconds must not be negative")
+        if not 1 <= self.historic_page_size <= HISTORIC_MAX_PAGE_SIZE:
+            raise ConfigError(
+                f"download.historic_page_size must be 1..{HISTORIC_MAX_PAGE_SIZE} "
+                f"(TNS's documented maximum), got {self.historic_page_size}"
+            )
 
 
 @dataclass(frozen=True)
@@ -199,13 +216,16 @@ class DatabaseConfig:
 class ScheduleConfig:
     """Used only by ``serve``. Kubernetes deployments use CronJobs and ignore these.
 
-    Three jobs, resolving the design's §5.4-vs-A.6 ambiguity explicitly:
+    Four jobs, resolving the design's §5.4-vs-A.6 ambiguity explicitly:
 
     * ``full_cron`` — the daily full snapshot.
     * ``delta_cron`` — the hourly delta (``catchup_hours`` defaults to 1, i.e.
       exactly the current hour).
     * ``catchup_cron`` — a daily 24-hour catch-up that repairs any hours missed
       while the server was down. Idempotent, so re-applying is harmless.
+    * ``historic_cron`` — the pre-2016 SN list. A closed set that TNS serves
+      only through its search page and asks not to be hammered, so weekly: the
+      default is Sunday 03:00 UT.
 
     An empty cron string disables that job.
     """
@@ -213,6 +233,7 @@ class ScheduleConfig:
     full_cron: str = "0 0 * * *"
     delta_cron: str = "10 * * * *"
     catchup_cron: str = "30 0 * * *"
+    historic_cron: str = "0 3 * * 0"
     catchup_hours: int = 1
     catchup_window_hours: int = 24
 
@@ -260,6 +281,10 @@ class Config:
     @property
     def csv_path(self) -> Path:
         return self.download.workdir / FULL_SNAPSHOT_FILENAME.removesuffix(".zip")
+
+    @property
+    def historic_csv_path(self) -> Path:
+        return self.download.workdir / HISTORIC_FILENAME
 
 
 # --- loading ----------------------------------------------------------------
@@ -324,6 +349,10 @@ def load_config(
             timeout_seconds=float(pick(download_data, "timeout_seconds", 120.0)),
             throttle_seconds=float(pick(download_data, "throttle_seconds", 10.0)),
             workdir=Path(str(pick(download_data, "workdir", DEFAULT_WORKDIR))),
+            historic_url=str(pick(download_data, "historic_url", DEFAULT_HISTORIC_URL)),
+            historic_page_size=int(
+                pick(download_data, "historic_page_size", HISTORIC_MAX_PAGE_SIZE)
+            ),
         ),
         database=DatabaseConfig(
             dsn=str(pick(database_data, "dsn", "")),
@@ -334,6 +363,7 @@ def load_config(
             full_cron=str(pick(schedule_data, "full_cron", "0 0 * * *")),
             delta_cron=str(pick(schedule_data, "delta_cron", "10 * * * *")),
             catchup_cron=str(pick(schedule_data, "catchup_cron", "30 0 * * *")),
+            historic_cron=str(pick(schedule_data, "historic_cron", "0 3 * * 0")),
             catchup_hours=int(pick(schedule_data, "catchup_hours", 1)),
             catchup_window_hours=int(pick(schedule_data, "catchup_window_hours", 24)),
         ),
@@ -365,6 +395,10 @@ def _apply_env(config: Config, env: Mapping[str, str]) -> Config:
         download = replace(download, throttle_seconds=_as_float(v, "TNS_THROTTLE"))
     if (v := env.get("TNS_WORKDIR")) is not None:
         download = replace(download, workdir=Path(v))
+    if (v := env.get("TNS_HISTORIC_URL")) is not None:
+        download = replace(download, historic_url=v)
+    if (v := env.get("TNS_HISTORIC_PAGE_SIZE")) is not None:
+        download = replace(download, historic_page_size=_as_int(v, "TNS_HISTORIC_PAGE_SIZE"))
 
     database = config.database
     if (v := env.get("DATABASE_URL")) is not None:
@@ -381,6 +415,8 @@ def _apply_env(config: Config, env: Mapping[str, str]) -> Config:
         schedule = replace(schedule, delta_cron=v)
     if (v := env.get("TNS_CATCHUP_CRON")) is not None:
         schedule = replace(schedule, catchup_cron=v)
+    if (v := env.get("TNS_HISTORIC_CRON")) is not None:
+        schedule = replace(schedule, historic_cron=v)
     if (v := env.get("TNS_CATCHUP_HOURS")) is not None:
         schedule = replace(schedule, catchup_hours=_as_int(v, "TNS_CATCHUP_HOURS"))
     if (v := env.get("TNS_CATCHUP_WINDOW_HOURS")) is not None:

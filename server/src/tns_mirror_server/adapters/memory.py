@@ -12,10 +12,11 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from ..errors import ParseError
+from ..ports.historic import HistoricRecord
 from ..ports.source import TnsRecord
 from ..ports.store import MirrorMeta
 
-__all__ = ["FakeSource", "MemoryStore"]
+__all__ = ["FakeHistoricSource", "FakeSource", "MemoryStore"]
 
 
 class MemoryStore:
@@ -23,18 +24,21 @@ class MemoryStore:
 
     def __init__(self, *, schema_version: int = 1) -> None:
         self.rows: dict[int, TnsRecord] = {}
+        self.historic_rows: dict[int, HistoricRecord] = {}
         self.snapshots: dict[int, date] = {}
         self.replace_calls = 0
         self.upsert_calls = 0
+        self.replace_historic_calls = 0
         self.migrated = False
         self._schema_version = schema_version
         self._last_full: datetime | None = None
         self._last_delta: datetime | None = None
+        self._last_historic: datetime | None = None
         self._last_snapshot: date | None = None
 
     def migrate(self) -> list[str]:
         already, self.migrated = self.migrated, True
-        return [] if already else ["0001_initial"]
+        return [] if already else ["0001_initial", "0002_historic_sne"]
 
     def replace(self, records: Iterable[TnsRecord], *, snapshot: date) -> int:
         # Materialise before mutating: a real transaction would not expose a
@@ -61,8 +65,20 @@ class MemoryStore:
             self._last_delta = datetime.now(UTC)
         return written
 
+    def replace_historic(self, records: Iterable[HistoricRecord], *, snapshot: date) -> int:
+        # Materialised first for the same reason as replace(); and deliberately
+        # a separate dict, so a test can prove the two tables never touch.
+        incoming = {record.objid: record for record in records if record.objid is not None}
+        self.historic_rows = incoming
+        self.replace_historic_calls += 1
+        self._last_historic = datetime.now(UTC)
+        return len(incoming)
+
     def count(self) -> int:
         return len(self.rows)
+
+    def count_historic(self) -> int:
+        return len(self.historic_rows)
 
     def meta(self) -> MirrorMeta:
         return MirrorMeta(
@@ -70,6 +86,7 @@ class MemoryStore:
             last_full_sync_at=self._last_full,
             last_delta_sync_at=self._last_delta,
             last_source_snapshot=self._last_snapshot,
+            last_historic_sync_at=self._last_historic,
         )
 
     # convenience for assertions
@@ -112,3 +129,26 @@ class FakeSource:
         if payload is None:
             raise ParseError(f"quiet hour: no header row in {source}")
         yield from payload
+
+
+class FakeHistoricSource:
+    """A ``HistoricSource`` serving canned records.
+
+    ``rows`` is what ``parse`` yields; mapping it to an exception makes ``fetch``
+    raise it, which is how the 429 path is tested.
+    """
+
+    def __init__(self, rows: list[HistoricRecord] | Exception | None = None) -> None:
+        self.rows = [] if rows is None else rows
+        self.fetches: list[bool] = []
+
+    def fetch(self, *, reuse_existing: bool = False) -> Path:
+        self.fetches.append(reuse_existing)
+        if isinstance(self.rows, Exception):
+            raise self.rows
+        return Path("/fake/tns_historic_sne.csv")
+
+    def parse(self, source: Path) -> Iterator[HistoricRecord]:
+        if isinstance(self.rows, Exception):  # fetch() already raised; belt and braces
+            raise self.rows
+        yield from self.rows

@@ -54,10 +54,18 @@ as form data on a `POST`, alongside a marker naming the bot.
 | `download.timeout_seconds` | `TNS_TIMEOUT` | `120` |
 | `download.throttle_seconds` | `TNS_THROTTLE` | `10` |
 | `download.workdir` | `TNS_WORKDIR` | `/var/lib/tns-mirror` |
+| `download.historic_url` | `TNS_HISTORIC_URL` | `https://www.wis-tns.org/search` |
+| `download.historic_page_size` | `TNS_HISTORIC_PAGE_SIZE` | `100` |
 
 `throttle_seconds` is the pause between consecutive downloads during a catch-up.
 Do not lower it without a reason: TNS rate-limits, and a `429` stops the catch-up
 early.
+
+`historic_url` is the TNS search page the pre-2016 supernovae are paged out of
+(`isTNS_AT=no&format=csv`); the only reason to change it is to point at the TNS
+sandbox. `historic_page_size` is capped at 100, the maximum TNS documents. The
+historic fetch paces itself from TNS's `x-rate-limit-*` response headers rather
+than from `throttle_seconds`, which is used only if those headers are missing.
 
 `workdir` holds the transient zip and CSV. It is safe to wipe — losing it costs
 one re-download.
@@ -103,10 +111,17 @@ them twice a year.
 | `schedule.full_cron` | `TNS_FULL_CRON` | `0 0 * * *` | the daily full snapshot |
 | `schedule.delta_cron` | `TNS_DELTA_CRON` | `10 * * * *` | the hourly delta |
 | `schedule.catchup_cron` | `TNS_CATCHUP_CRON` | `30 0 * * *` | a daily 24-hour catch-up |
+| `schedule.historic_cron` | `TNS_HISTORIC_CRON` | `0 3 * * 0` | the pre-2016 SNe, weekly |
 | `schedule.catchup_hours` | `TNS_CATCHUP_HOURS` | `1` | window for the hourly job |
 | `schedule.catchup_window_hours` | `TNS_CATCHUP_WINDOW_HOURS` | `24` | window for the daily catch-up |
 
-An empty cron string disables that job.
+An empty cron string disables that job. Disabling `historic_cron` also skips the
+initial historic fetch on first start, so a mirror that only wants the live
+catalogue never touches the search page.
+
+The historic job is weekly on purpose. The pre-2016 list is closed — nothing new
+is ever added to it — and TNS asks that the search page not be used for bulk
+retrieval, so once a week is a courtesy re-check for corrections, not a sync.
 
 The daily catch-up exists to repair hours missed while the server was down.
 Deltas are idempotent, so re-applying an hour that already landed is a no-op.
@@ -129,6 +144,8 @@ download:
   timeout_seconds: 120
   throttle_seconds: 10
   workdir: /var/lib/tns-mirror
+  historic_url: https://www.wis-tns.org/search
+  historic_page_size: 100
 
 database:
   # Connection settings come from the environment — PGHOST/PGUSER/PGPASSWORD/
@@ -140,6 +157,7 @@ schedule:
   full_cron: "0 0 * * *"
   delta_cron: "10 * * * *"
   catchup_cron: "30 0 * * *"
+  historic_cron: "0 3 * * 0"
   catchup_hours: 1
   catchup_window_hours: 24
 ```

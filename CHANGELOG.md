@@ -8,6 +8,57 @@ All notable changes to this project are documented here. This project follows
 consumer pinning `tns-mirror-client>=1,<2` is pinning the contract. A breaking
 schema change bumps the major on both.
 
+## [1.1.0] — unreleased
+
+Schema **v1.1**: additive only. A new table and a new nullable metadata column.
+Every v1.0 reader keeps working unchanged; `tns-mirror-client>=1,<2` needs no
+action.
+
+### Added — the pre-2016 supernovae
+
+- **`tns_historic_sne`**, a second catalogue table holding the CBAT-era
+  supernovae (SN 1885A – SN 2015bh, ~6,600 objects) that TNS imported when it
+  took over IAU naming on 2016-01-01. TNS keeps these **out of** its staged
+  `tns_public_objects.csv` and exposes them only through the search page
+  (`isTNS_AT=no`), so they were never in the mirror before.
+
+  The export has a different shape from the staged csv, so rather than mapping
+  it onto `tns_objects`, TNS's columns are stored **as published** — text,
+  uninterpreted, empty cells as `NULL`. Two deliberate exceptions, both
+  additive: `name` has its whitespace removed (`SN 2015bh` → `SN2015bh`) so a
+  name lookup works across both tables, and `ra`/`dec` are also stored in
+  degrees, derived from TNS's sexagesimal strings, so the `(ra, dec)`
+  cone-search index exists here too. The original strings are kept in
+  `ra_hms`/`dec_dms`. See `schema/README.md` for the column list.
+- **`tns_mirror_meta.last_historic_sync_at`** (nullable), and `historic_rows` /
+  `last_historic_sync_at` lines in `status`.
+- **`sync-historic`** command, and a fourth scheduled job in `serve`
+  (`schedule.historic_cron`, default `0 3 * * 0` — weekly). `serve` also seeds
+  an empty historic table on first start, best-effort: a rate-limited search
+  page logs an error and the catalogue still serves.
+- Settings `download.historic_url` (`TNS_HISTORIC_URL`) and
+  `download.historic_page_size` (`TNS_HISTORIC_PAGE_SIZE`, capped at TNS's
+  documented maximum of 100).
+- `print-grants` now grants `SELECT` on `tns_historic_sne` as well.
+
+### How the fetch behaves
+
+TNS discourages bulk retrieval through the search page. This one is small (66
+pages), closed (nothing is ever added to the pre-2016 list), weekly, and follows
+TNS's stated rate-limit practice: `x-rate-limit-remaining` is read on every
+response and, at zero, the next request waits `x-rate-limit-reset + 1` seconds
+rather than provoking a 429. Pages stream into a temporary file that is renamed
+into place only after the last page, an HTML or empty response is refused before
+it reaches the database, and the table swap is one transaction — so the
+historic list can never be half-written, and a full refresh of `tns_objects`
+never touches it (nor the reverse).
+
+### Not in this release
+
+- The **client** has no helper for the historic table yet. It is reachable
+  through plain SQL with the same read-only role; a typed accessor is a
+  follow-up.
+
 ## [Unreleased]
 
 ## [1.0.4] — 2026-08-05

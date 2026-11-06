@@ -9,7 +9,8 @@ import pytest
 
 from conftest import make_config
 from tns_mirror_server import cli
-from tns_mirror_server.adapters.memory import FakeSource, MemoryStore
+from tns_mirror_server.adapters.memory import FakeHistoricSource, FakeSource, MemoryStore
+from tns_mirror_server.ports.historic import HistoricRecord
 from tns_mirror_server.ports.source import TnsRecord
 
 MARKER = 'tns_marker{"tns_id":"1234","type":"user","name":"tester"}'
@@ -31,7 +32,27 @@ def wired(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "_store", fake_store)
     monkeypatch.setattr(cli, "load_config", lambda _path: make_config(tmp_path))
     monkeypatch.setattr(cli, "build_source", lambda _config: source)
+    monkeypatch.setattr(cli, "build_historic_source", lambda _config: FakeHistoricSource())
     return store, source
+
+
+HISTORIC = HistoricRecord(
+    objid=6568,
+    name="SN2015bh",
+    ra=137.396,
+    dec=33.123,
+    ra_hms="09:09:35.059",
+    dec_dms="+33:07:22.12",
+    obj_type="SN IIn",
+)
+
+
+@pytest.fixture
+def wired_historic(monkeypatch, wired):
+    """``wired`` plus a historic feed that actually has rows."""
+    historic = FakeHistoricSource([HISTORIC])
+    monkeypatch.setattr(cli, "build_historic_source", lambda _config: historic)
+    return (*wired, historic)
 
 
 def test_migrate_reports_what_it_applied(wired, capsys):
@@ -83,6 +104,26 @@ def test_catch_up_accepts_an_explicit_window(wired):
     assert len(source.downloaded) == 3
 
 
+def test_sync_historic_fills_its_own_table_only(wired_historic, capsys):
+    store, source, historic = wired_historic
+
+    assert cli.main(["sync-historic"]) == 0
+
+    assert historic.fetches == [False]
+    assert source.downloaded == []  # the catalogue feed was not touched
+    assert store.count_historic() == 1
+    assert store.count() == 0
+    assert "historic SNe" in capsys.readouterr().out
+
+
+def test_sync_historic_can_reuse_the_downloaded_export(wired_historic):
+    _, _, historic = wired_historic
+
+    assert cli.main(["sync-historic", "--reuse-existing"]) == 0
+
+    assert historic.fetches == [True]
+
+
 def test_redownload_and_reuse_existing_are_mutually_exclusive():
     with pytest.raises(SystemExit):
         cli.build_parser().parse_args(["sync", "--redownload", "--reuse-existing"])
@@ -94,8 +135,10 @@ def test_status_reports_freshness(wired, capsys):
 
     assert cli.main(["status"]) == 0
     out = capsys.readouterr().out
-    assert "schema_version:       1" in out
-    assert "rows:                 1" in out
+    assert "schema_version:        1" in out
+    assert "rows:                  1" in out
+    assert "historic_rows:         0" in out
+    assert "last_historic_sync_at: never" in out
 
 
 def test_status_exits_stale_when_nothing_has_ever_synced(wired, capsys):
@@ -124,6 +167,7 @@ def test_print_grants_is_least_privilege(wired, capsys):
     sql = statements(capsys.readouterr().out)
 
     assert "GRANT SELECT ON public.tns_objects TO tns_ro;" in sql
+    assert "GRANT SELECT ON public.tns_historic_sne TO tns_ro;" in sql
     # The client needs the metadata table to check the schema version it was
     # built against — granting only the catalogue leaves it unable to.
     assert "GRANT SELECT ON public.tns_mirror_meta TO tns_ro;" in sql
@@ -155,6 +199,7 @@ def test_print_grants_aligns_for_any_schema_name(monkeypatch, wired, tmp_path, c
     sql = statements(capsys.readouterr().out)
 
     assert "GRANT SELECT ON astro_catalogues.tns_objects TO tns_ro;" in sql
+    assert "GRANT SELECT ON astro_catalogues.tns_historic_sne TO tns_ro;" in sql
     assert "GRANT SELECT ON astro_catalogues.tns_mirror_meta TO tns_ro;" in sql
 
 
@@ -193,6 +238,49 @@ def test_serve_seeds_an_empty_catalogue_then_schedules(wired):
     assert source.downloaded == [None]
 
 
+def test_serve_seeds_an_empty_historic_table_too(wired_historic):
+    store, _, historic = wired_historic
+
+    assert cli.main(["serve", "--max-iterations", "0"]) == 0
+
+    assert historic.fetches == [False]
+    assert store.count_historic() == 1
+
+
+def test_serve_survives_a_failed_historic_seed(monkeypatch, wired, caplog):
+    # The catalogue is the service. A rate-limited search page on first start
+    # must not stop serve from running the schedule (invariant 7).
+    import requests
+
+    from tns_mirror_server.errors import SourceError
+
+    store, _ = wired
+    failing = FakeHistoricSource(SourceError("TNS said no"))
+    monkeypatch.setattr(cli, "build_historic_source", lambda _config: failing)
+
+    with caplog.at_level(logging.ERROR):
+        assert cli.main(["serve", "--max-iterations", "0"]) == 0
+
+    assert store.count() == 1  # the catalogue seed still happened
+    assert store.count_historic() == 0
+    assert "initial historic fetch failed" in caplog.text
+    del requests  # imported only to document that RequestException is handled too
+
+
+def test_serve_skips_historic_entirely_when_its_cron_is_empty(monkeypatch, wired, tmp_path):
+    from dataclasses import replace
+
+    def refuse(_config):
+        raise AssertionError("historic source must not be built when disabled")
+
+    monkeypatch.setattr(cli, "build_historic_source", refuse)
+    config = make_config(tmp_path)
+    config = replace(config, schedule=replace(config.schedule, historic_cron=""))
+    monkeypatch.setattr(cli, "load_config", lambda _path: config)
+
+    assert cli.main(["serve", "--max-iterations", "0"]) == 0
+
+
 def test_serve_does_not_reseed_a_populated_catalogue(wired):
     _, source = wired
     cli.main(["sync"])
@@ -209,7 +297,9 @@ def test_serve_refuses_when_every_schedule_is_empty(monkeypatch, wired, tmp_path
     config = make_config(tmp_path)
     config = replace(
         config,
-        schedule=replace(config.schedule, full_cron="", delta_cron="", catchup_cron=""),
+        schedule=replace(
+            config.schedule, full_cron="", delta_cron="", catchup_cron="", historic_cron=""
+        ),
     )
     monkeypatch.setattr(cli, "load_config", lambda _path: config)
 

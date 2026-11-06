@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
+from dataclasses import fields as dataclass_fields
 from datetime import date
 from itertools import islice
 from typing import Final
@@ -27,6 +28,7 @@ from psycopg import sql
 from ..config import Config, _require_identifier
 from ..errors import ConfigError
 from ..migrator import Migrator
+from ..ports.historic import HistoricRecord
 from ..ports.source import TnsRecord
 from ..ports.store import MirrorMeta
 
@@ -51,8 +53,14 @@ _COLUMNS: Final = (
     "reporting_group",
 )
 
+#: The historic table's columns, in contract order — every HistoricRecord field.
+_HISTORIC_COLUMNS: Final = tuple(f.name for f in dataclass_fields(HistoricRecord))
 
-def _chunked(iterable: Iterable[TnsRecord], size: int) -> Iterator[list[TnsRecord]]:
+#: Fixed, like tns_mirror_meta: the historic list is one table per schema.
+HISTORIC_TABLE: Final = "tns_historic_sne"
+
+
+def _chunked[R](iterable: Iterable[R], size: int) -> Iterator[list[R]]:
     iterator = iter(iterable)
     while batch := list(islice(iterator, size)):
         yield batch
@@ -102,6 +110,10 @@ class PostgresStore:
         return sql.Identifier(self._schema, self._table)
 
     @property
+    def _historic(self) -> sql.Identifier:
+        return sql.Identifier(self._schema, HISTORIC_TABLE)
+
+    @property
     def _meta_table(self) -> sql.Identifier:
         return sql.Identifier(self._schema, "tns_mirror_meta")
 
@@ -112,10 +124,11 @@ class PostgresStore:
 
     # --- writes -------------------------------------------------------------
 
-    def _insert_sql(self) -> sql.Composed:
+    @staticmethod
+    def _insert_sql(table: sql.Identifier, columns: tuple[str, ...]) -> sql.Composed:
         assignments = sql.SQL(", ").join(
             sql.SQL("{col} = EXCLUDED.{col}").format(col=sql.Identifier(name))
-            for name in _COLUMNS
+            for name in columns
             if name != "objid"
         )
         # ON CONFLICT on the full-snapshot path too: the DELETE means the only
@@ -127,17 +140,23 @@ class PostgresStore:
             "ON CONFLICT (objid) DO UPDATE SET {assignments}, "
             "source_snapshot = EXCLUDED.source_snapshot, refreshed_at = now()"
         ).format(
-            table=self._catalogue,
-            columns=sql.SQL(", ").join(sql.Identifier(name) for name in _COLUMNS),
-            values=sql.SQL(", ").join(sql.Placeholder(name) for name in _COLUMNS),
+            table=table,
+            columns=sql.SQL(", ").join(sql.Identifier(name) for name in columns),
+            values=sql.SQL(", ").join(sql.Placeholder(name) for name in columns),
             snapshot=sql.Placeholder("source_snapshot"),
             assignments=assignments,
         )
 
     def _write_batches(
-        self, cur: psycopg.Cursor, records: Iterable[TnsRecord], snapshot: date
+        self,
+        cur: psycopg.Cursor,
+        records: Iterable[TnsRecord] | Iterable[HistoricRecord],
+        snapshot: date,
+        *,
+        table: sql.Identifier | None = None,
+        columns: tuple[str, ...] = _COLUMNS,
     ) -> int:
-        statement = self._insert_sql()
+        statement = self._insert_sql(table or self._catalogue, columns)
         written = 0
         for batch in _chunked(records, BATCH_SIZE):
             params = [{**record.as_row(), "source_snapshot": snapshot} for record in batch]
@@ -175,19 +194,38 @@ class PostgresStore:
                 )
         return written
 
+    def replace_historic(self, records: Iterable[HistoricRecord], *, snapshot: date) -> int:
+        """Swap the historic SN table atomically. Never touches the catalogue."""
+        with self._conn.transaction(), self._conn.cursor() as cur:
+            cur.execute(sql.SQL("DELETE FROM {}").format(self._historic))
+            written = self._write_batches(
+                cur, records, snapshot, table=self._historic, columns=_HISTORIC_COLUMNS
+            )
+            cur.execute(
+                sql.SQL("UPDATE {table} SET last_historic_sync_at = now() WHERE id = 1").format(
+                    table=self._meta_table
+                )
+            )
+        log.info("historic SNe committed: %d rows (snapshot %s)", written, snapshot)
+        return written
+
     # --- reads (operational only; consumer queries belong to the client) -----
 
     def count(self) -> int:
-        row = self._conn.execute(
-            sql.SQL("SELECT count(*) FROM {}").format(self._catalogue)
-        ).fetchone()
+        return self._count(self._catalogue)
+
+    def count_historic(self) -> int:
+        return self._count(self._historic)
+
+    def _count(self, table: sql.Identifier) -> int:
+        row = self._conn.execute(sql.SQL("SELECT count(*) FROM {}").format(table)).fetchone()
         return int(row[0]) if row else 0
 
     def meta(self) -> MirrorMeta:
         row = self._conn.execute(
             sql.SQL(
                 "SELECT schema_version, last_full_sync_at, last_delta_sync_at, "
-                "last_source_snapshot FROM {table} WHERE id = 1"
+                "last_source_snapshot, last_historic_sync_at FROM {table} WHERE id = 1"
             ).format(table=self._meta_table)
         ).fetchone()
         if row is None:
@@ -200,4 +238,5 @@ class PostgresStore:
             last_full_sync_at=row[1],
             last_delta_sync_at=row[2],
             last_source_snapshot=row[3],
+            last_historic_sync_at=row[4],
         )

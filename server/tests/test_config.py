@@ -34,6 +34,9 @@ def test_defaults_apply_when_only_a_credential_is_supplied():
     assert config.database.table == "tns_objects"
     assert config.schedule.full_cron == "0 0 * * *"
     assert config.schedule.catchup_window_hours == 24
+    assert config.schedule.historic_cron == "0 3 * * 0"  # weekly, not hourly
+    assert config.download.historic_url == "https://www.wis-tns.org/search"
+    assert config.download.historic_page_size == 100
 
 
 def test_environment_overrides_the_config_file(tmp_path):
@@ -145,6 +148,34 @@ def test_download_url_must_name_the_snapshot_file():
 def test_numeric_settings_report_the_offending_variable():
     with pytest.raises(ConfigError, match="TNS_TIMEOUT"):
         load_config(None, BASE_ENV | {"TNS_TIMEOUT": "soon"})
+
+
+def test_historic_settings_come_from_file_and_environment(tmp_path):
+    path = write_yaml(
+        tmp_path,
+        "download:\n  historic_page_size: 50\nschedule:\n  historic_cron: '0 4 1 * *'\n",
+    )
+
+    config = load_config(
+        path, BASE_ENV | {"TNS_HISTORIC_URL": "https://sandbox.wis-tns.org/search"}
+    )
+
+    assert config.download.historic_page_size == 50
+    assert config.schedule.historic_cron == "0 4 1 * *"
+    assert config.download.historic_url == "https://sandbox.wis-tns.org/search"
+
+
+def test_historic_url_must_be_https():
+    with pytest.raises(ConfigError, match="historic_url must be https"):
+        load_config(None, BASE_ENV | {"TNS_HISTORIC_URL": "http://www.wis-tns.org/search"})
+
+
+@pytest.mark.parametrize("size", ["0", "101", "500"])
+def test_historic_page_size_is_capped_at_the_documented_maximum(size):
+    # The UI offers 500 but the documentation promises only 100; asking for more
+    # is asking TNS for something it never said it would honour.
+    with pytest.raises(ConfigError, match=r"historic_page_size must be 1\.\.100"):
+        load_config(None, BASE_ENV | {"TNS_HISTORIC_PAGE_SIZE": size})
 
 
 def test_catchup_window_must_fit_in_a_day():

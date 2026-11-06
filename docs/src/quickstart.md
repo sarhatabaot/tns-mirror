@@ -137,11 +137,13 @@ whole catalogue, so give it a minute or two.
 
 ```console
 $ docker compose exec server tns-mirror-server status
-schema_version:       1
-rows:                 168423
-last_full_sync_at:    2026-07-26 00:04:11+00
-last_delta_sync_at:   2026-07-26 11:10:38+00
-last_source_snapshot: 2026-07-26
+schema_version:        1
+rows:                  168423
+historic_rows:         6568
+last_full_sync_at:     2026-07-26 00:04:11+00
+last_delta_sync_at:    2026-07-26 11:10:38+00
+last_historic_sync_at: 2026-07-20 03:02:47+00
+last_source_snapshot:  2026-07-26
 ```
 
 A non-zero `rows` and a recent `last_full_sync_at` means you are done. From here
@@ -238,7 +240,7 @@ services:
       retries: 20
 
   server:
-    image: sarhatabaot/tns-mirror-server:1.0.4
+    image: sarhatabaot/tns-mirror-server:1.1.0
     depends_on:
       db:
         condition: service_healthy

@@ -19,12 +19,21 @@ from datetime import UTC, date, datetime, timedelta
 
 import requests
 
+from .errors import SourceError
+from .ports.historic import HistoricRecord, HistoricSource
 from .ports.source import Source, TnsRecord
 from .ports.store import Store
 
 log = logging.getLogger(__name__)
 
-__all__ = ["CatchUpResult", "SyncResult", "catch_up", "delta_sync", "full_sync"]
+__all__ = [
+    "CatchUpResult",
+    "SyncResult",
+    "catch_up",
+    "delta_sync",
+    "full_sync",
+    "historic_sync",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +45,12 @@ class SyncResult:
     hour: int | None = None
 
     def describe(self) -> str:
-        where = "full snapshot" if self.hour is None else f"delta hour {self.hour:02d}"
+        if self.kind == "historic":
+            where = "historic SNe"
+        elif self.hour is None:
+            where = "full snapshot"
+        else:
+            where = f"delta hour {self.hour:02d}"
         skipped = f", {self.rows_skipped} skipped" if self.rows_skipped else ""
         return f"{where} ({self.snapshot}): {self.rows_written} rows written{skipped}"
 
@@ -67,7 +81,9 @@ class _Skipped:
         self.count = 0
 
 
-def _addressable(records: Iterable[TnsRecord], skipped: _Skipped) -> Iterator[TnsRecord]:
+def _addressable[R: (TnsRecord, HistoricRecord)](
+    records: Iterable[R], skipped: _Skipped
+) -> Iterator[R]:
     """Drop rows with no ``objid``.
 
     ``objid`` is the primary key and the upsert conflict target, so a row without
@@ -108,6 +124,30 @@ def full_sync(store: Store, source: Source, *, reuse_existing: bool = False) -> 
     skipped = _Skipped()
     written = store.replace(_addressable(source.parse(path), skipped), snapshot=snapshot)
     result = SyncResult("full", snapshot, written, skipped.count)
+    log.info("%s", result.describe())
+    return result
+
+
+def historic_sync(
+    store: Store, source: HistoricSource, *, reuse_existing: bool = False
+) -> SyncResult:
+    """Fetch the pre-2016 SN list and swap the historic table for it.
+
+    Stricter than :func:`full_sync` in one respect: the list is materialised and
+    an *empty* result refuses to replace anything. The staged snapshot is a file
+    TNS wrote; this is a paged search, and a query that suddenly matches nothing
+    — a renamed parameter, a login page — must not wipe 6,600 good rows.
+    """
+    snapshot = _utcnow().date()
+    path = source.fetch(reuse_existing=reuse_existing)  # network OUTSIDE the txn
+    skipped = _Skipped()
+    records = list(_addressable(source.parse(path), skipped))
+    if not records:
+        raise SourceError(
+            "historic export parsed to zero usable rows; keeping the previous table"
+        )
+    written = store.replace_historic(records, snapshot=snapshot)
+    result = SyncResult("historic", snapshot, written, skipped.count)
     log.info("%s", result.describe())
     return result
 

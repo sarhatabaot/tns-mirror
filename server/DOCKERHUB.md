@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
 
   server:
-    image: sarhatabaot/tns-mirror-server:1.0.4
+    image: sarhatabaot/tns-mirror-server:1.1.0
     depends_on:
       db:
         condition: service_healthy
@@ -92,11 +92,13 @@ anything missed while it was down.
 
 ```console
 $ docker compose exec server tns-mirror-server status
-schema_version:       1
-rows:                 168423
-last_full_sync_at:    2026-07-27 00:04:11+00
-last_delta_sync_at:   2026-07-27 11:10:38+00
-last_source_snapshot: 2026-07-27
+schema_version:        1
+rows:                  168423
+historic_rows:         6568
+last_full_sync_at:     2026-07-27 00:04:11+00
+last_delta_sync_at:    2026-07-27 11:10:38+00
+last_historic_sync_at: 2026-07-20 03:02:47+00
+last_source_snapshot:  2026-07-27
 ```
 
 ## Commands
@@ -219,7 +221,7 @@ cross-matching, no HTTP API — querying the catalogue belongs to the consumer, 
 
 ## Image
 
-- **Tags:** `1.0.4`, `1.0`, `latest`
+- **Tags:** `1.1.0`, `1.0`, `latest`
 - **Platforms:** `linux/amd64`, `linux/arm64`
 - **Base:** multi-stage [Wolfi](https://github.com/wolfi-dev), digest-pinned;
   compilers exist only in the builder stage

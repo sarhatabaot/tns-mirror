@@ -3,8 +3,16 @@
 Importing this package registers the shipped sources.
 """
 
-from .memory import FakeSource, MemoryStore
+from .memory import FakeHistoricSource, FakeSource, MemoryStore
 from .source_tns import TnsPublicObjects
+from .source_tns_historic import TnsHistoricSne
 from .store_postgres import PostgresStore
 
-__all__ = ["FakeSource", "MemoryStore", "PostgresStore", "TnsPublicObjects"]
+__all__ = [
+    "FakeHistoricSource",
+    "FakeSource",
+    "MemoryStore",
+    "PostgresStore",
+    "TnsHistoricSne",
+    "TnsPublicObjects",
+]

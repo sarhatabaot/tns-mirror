@@ -11,12 +11,23 @@ from tns_mirror_server.errors import ConfigError
 from tns_mirror_server.migrator import Migration, load_migrations
 
 
-def test_the_initial_migration_is_packaged():
-    # It ships inside the package so the image needs no files from outside it.
+def test_the_migrations_are_packaged():
+    # They ship inside the package so the image needs no files from outside it.
     migrations = load_migrations()
 
-    assert [m.version for m in migrations] == ["0001_initial"]
+    assert [m.version for m in migrations] == ["0001_initial", "0002_historic_sne"]
     assert "CREATE TABLE IF NOT EXISTS" in migrations[0].template
+    assert "tns_historic_sne" in migrations[1].template
+
+
+def test_the_historic_migration_is_additive_only():
+    # Schema v1 readers must keep working: no DROP, no RENAME, no type change.
+    template = load_migrations()[1].template.upper()
+
+    assert "DROP " not in template
+    assert "RENAME" not in template
+    assert "ALTER COLUMN" not in template
+    assert "ADD COLUMN IF NOT EXISTS LAST_HISTORIC_SYNC_AT TIMESTAMPTZ" in template
 
 
 def test_migrations_are_ordered_by_version():

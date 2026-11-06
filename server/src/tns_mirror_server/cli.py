@@ -6,6 +6,7 @@ Design §5.4 and A.6. One-shot commands are the primitive:
     tns-mirror-server sync              full snapshot (daily)
     tns-mirror-server sync --hour HH    one hourly delta
     tns-mirror-server catch-up [N]      trailing N-hour delta window (default 24)
+    tns-mirror-server sync-historic     the pre-2016 SNe, into their own table (weekly)
     tns-mirror-server serve             long-lived process with an internal scheduler
     tns-mirror-server status            row count and freshness
     tns-mirror-server print-grants      SQL for the read-only consumer role
@@ -27,9 +28,11 @@ import requests
 
 from . import __version__
 from .adapters import PostgresStore
+from .adapters.store_postgres import HISTORIC_TABLE
 from .config import Config, load_config
-from .engine import catch_up, delta_sync, full_sync
+from .engine import catch_up, delta_sync, full_sync, historic_sync
 from .errors import TnsMirrorError
+from .ports.historic import HistoricSource, get_historic_source
 from .ports.source import Source, get_source
 from .ports.store import Store
 from .scheduler import CronSpec, Job, Scheduler
@@ -60,6 +63,12 @@ def build_source(config: Config) -> Source:
     """
     config.auth.validate()
     return get_source(config.source)(config)
+
+
+def build_historic_source(config: Config) -> HistoricSource:
+    """The provider's historic feed, under the same credential rule as :func:`build_source`."""
+    config.auth.validate()
+    return get_historic_source(config.source)(config)
 
 
 @contextmanager
@@ -102,16 +111,27 @@ def cmd_catch_up(config: Config, args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_sync_historic(config: Config, args: argparse.Namespace) -> int:
+    source = build_historic_source(config)
+    with _store(config) as store:
+        result = historic_sync(store, source, reuse_existing=bool(args.reuse_existing))
+    print(result.describe())
+    return EXIT_OK
+
+
 def cmd_status(config: Config, args: argparse.Namespace) -> int:
     with _store(config) as store:
         rows = store.count()
+        historic_rows = store.count_historic()
         meta = store.meta()
 
-    print(f"schema_version:       {meta.schema_version}")
-    print(f"rows:                 {rows}")
-    print(f"last_full_sync_at:    {meta.last_full_sync_at or 'never'}")
-    print(f"last_delta_sync_at:   {meta.last_delta_sync_at or 'never'}")
-    print(f"last_source_snapshot: {meta.last_source_snapshot or 'never'}")
+    print(f"schema_version:        {meta.schema_version}")
+    print(f"rows:                  {rows}")
+    print(f"historic_rows:         {historic_rows}")
+    print(f"last_full_sync_at:     {meta.last_full_sync_at or 'never'}")
+    print(f"last_delta_sync_at:    {meta.last_delta_sync_at or 'never'}")
+    print(f"last_historic_sync_at: {meta.last_historic_sync_at or 'never'}")
+    print(f"last_source_snapshot:  {meta.last_source_snapshot or 'never'}")
 
     if args.max_age_hours is None:
         return EXIT_OK
@@ -150,8 +170,9 @@ def cmd_print_grants(config: Config, args: argparse.Namespace) -> int:
     connect = f"GRANT CONNECT ON DATABASE {args.database}"
     usage = f"GRANT USAGE ON SCHEMA {schema}"
     catalogue = f"GRANT SELECT ON {schema}.{table}"
+    historic = f"GRANT SELECT ON {schema}.{HISTORIC_TABLE}"
     metadata = f"GRANT SELECT ON {schema}.tns_mirror_meta"
-    width = max(len(connect), len(usage), len(catalogue), len(metadata))
+    width = max(len(connect), len(usage), len(catalogue), len(historic), len(metadata))
 
     def grant(statement: str) -> str:
         return f"{statement:<{width}} TO {role};"
@@ -167,9 +188,11 @@ CREATE ROLE {role} LOGIN PASSWORD :'pw';
 {grant(connect)}
 {grant(usage)}
 
--- Exactly two objects: the catalogue, and the metadata a client needs to check
--- the schema version it was built against and how fresh the data is.
+-- Exactly three objects: the catalogue, the historic (pre-2016) SNe, and the
+-- metadata a client needs to check the schema version it was built against
+-- and how fresh the data is.
 {grant(catalogue)}
+{grant(historic)}
 {grant(metadata)}
 
 -- Deliberately no ALTER DEFAULT PRIVILEGES: that would grant this role SELECT
@@ -182,16 +205,28 @@ CREATE ROLE {role} LOGIN PASSWORD :'pw';
 def cmd_serve(config: Config, args: argparse.Namespace) -> int:
     """Long-lived process: migrate, seed if empty, then run the schedule."""
     source = build_source(config)
+    schedule = config.schedule
+    historic_enabled = bool(schedule.historic_cron.strip())
+    historic = build_historic_source(config) if historic_enabled else None
 
     with _store(config) as store:
         store.migrate()
         empty = store.count() == 0
+        historic_empty = store.count_historic() == 0
     if empty:
         log.info("catalogue is empty; taking an initial full snapshot")
         with _store(config) as store:
             full_sync(store, source)
-
-    schedule = config.schedule
+    if historic is not None and historic_empty:
+        # Seeded on a best-effort basis: the catalogue is the service, and a
+        # rate-limited search page must not stop the process from serving it.
+        # The weekly job retries.
+        log.info("historic table is empty; fetching the pre-2016 SNe")
+        try:
+            with _store(config) as store:
+                historic_sync(store, historic)
+        except (TnsMirrorError, requests.RequestException):
+            log.exception("initial historic fetch failed; the scheduled job will retry")
 
     def run_full() -> None:
         with _store(config) as store:
@@ -205,12 +240,18 @@ def cmd_serve(config: Config, args: argparse.Namespace) -> int:
         with _store(config) as store:
             catch_up(store, source, schedule.catchup_window_hours)
 
+    def run_historic() -> None:
+        if historic is not None:
+            with _store(config) as store:
+                historic_sync(store, historic)
+
     # A connection per run rather than one held open for the process lifetime:
     # a daemon's idle connection is the thing that silently dies overnight.
     wanted: list[tuple[str, str, Callable[[], None]]] = [
         ("full", schedule.full_cron, run_full),
         ("delta", schedule.delta_cron, run_delta),
         ("catch-up", schedule.catchup_cron, run_catchup),
+        ("historic", schedule.historic_cron, run_historic),
     ]
     jobs = [
         Job(name=name, spec=CronSpec.parse(expr), run=run)
@@ -281,6 +322,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="window size, 1-24 (default: schedule.catchup_window_hours, 24)",
     )
     catchup.set_defaults(func=cmd_catch_up)
+
+    historic = sub.add_parser(
+        "sync-historic",
+        help="fetch the pre-2016 supernovae from the TNS search page into their own table",
+    )
+    historic.add_argument(
+        "--reuse-existing",
+        action="store_true",
+        help="ingest the already-downloaded export if present, without fetching (debugging)",
+    )
+    historic.set_defaults(func=cmd_sync_historic)
 
     serve = sub.add_parser("serve", help="run continuously on the configured schedule")
     serve.add_argument("--max-iterations", type=int, default=None, help=argparse.SUPPRESS)

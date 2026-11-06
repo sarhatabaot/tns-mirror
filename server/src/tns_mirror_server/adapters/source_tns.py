@@ -10,7 +10,6 @@ down".
 from __future__ import annotations
 
 import csv
-import json
 import logging
 import shutil
 import zipfile
@@ -23,6 +22,7 @@ import requests
 from ..config import FULL_SNAPSHOT_FILENAME, Config
 from ..errors import ParseError, SourceError
 from ..ports.source import TnsRecord, register_source
+from .tns_auth import build_request, rejection_detail
 
 log = logging.getLogger(__name__)
 
@@ -108,33 +108,9 @@ class TnsPublicObjects:
 
     # --- authentication (§5.0) ---------------------------------------------
 
-    def _tns_marker(self) -> str:
-        """The ``tns_marker`` User-Agent TNS uses to attribute a request."""
-        auth = self._config.auth
-        if auth.mode == "marker":
-            return auth.user_agent
-        payload = json.dumps(
-            {"tns_id": auth.bot_id, "type": "bot", "name": auth.bot_name},
-            separators=(", ", ": "),
-        )
-        return f"tns_marker{payload}"
-
     def _build_request(self) -> tuple[str, dict[str, str], dict[str, str] | None]:
-        """Return ``(method, headers, form_data)`` for the configured auth mode.
-
-        Re-validates rather than trusting that config was checked: invariant 4
-        says the *download* refuses without a credential, so the guard belongs
-        here too, not only at startup.
-        """
-        auth = self._config.auth
-        auth.validate()
-
-        headers = {"User-Agent": self._tns_marker()}
-        if auth.mode == "marker":
-            return "GET", headers, None
-        # Bot: TNS expects the api_key as form data on a POST, with the marker
-        # identifying which bot is asking. Different verb, not just a header.
-        return "POST", headers, {"api_key": auth.api_key}
+        """``(method, headers, form_data)`` — see :mod:`.tns_auth`."""
+        return build_request(self._config.auth)
 
     # --- download -----------------------------------------------------------
 
@@ -201,20 +177,7 @@ class TnsPublicObjects:
         original ``HTTPError`` reaches it.
         """
         if response.status_code in (401, 403):
-            mode = self._config.auth.mode
-            if mode == "bot":
-                detail = (
-                    "TNS rejected the bot credentials. Check TNS_API_KEY, "
-                    "TNS_BOT_ID and TNS_BOT_NAME against Bot Management in your "
-                    "TNS profile — the id and name must belong to the same bot "
-                    "as the key."
-                )
-            else:
-                detail = (
-                    "TNS rejected the marker. Check TNS_USER_AGENT is the "
-                    "tns_marker for a registered account, copied whole, "
-                    "including the surrounding braces."
-                )
+            detail = rejection_detail(self._config.auth)
             raise SourceError(f"HTTP {response.status_code} from TNS. {detail}")
 
         if response.status_code == 404:

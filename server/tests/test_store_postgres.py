@@ -22,6 +22,7 @@ import pytest
 from conftest import make_config
 from tns_mirror_server.adapters.store_postgres import PostgresStore
 from tns_mirror_server.errors import MigrationError
+from tns_mirror_server.ports.historic import HistoricRecord
 from tns_mirror_server.ports.source import TnsRecord
 
 pytestmark = pytest.mark.integration
@@ -34,6 +35,18 @@ if not DSN:  # pragma: no cover - environment dependent
 
 def record(objid, name, ra=1.0, dec=2.0, **kwargs) -> TnsRecord:
     return TnsRecord(objid=objid, name=name, ra=ra, dec=dec, **kwargs)
+
+
+def historic(objid, name, **kwargs) -> HistoricRecord:
+    return HistoricRecord(
+        objid=objid,
+        name=name,
+        ra=137.396,
+        dec=33.123,
+        ra_hms="09:09:35.059",
+        dec_dms="+33:07:22.12",
+        **kwargs,
+    )
 
 
 @pytest.fixture
@@ -57,10 +70,12 @@ def store(config):
 
 def test_migrate_creates_the_contract_and_is_idempotent(config):
     with PostgresStore.connect(config) as store:
-        assert store.migrate() == ["0001_initial"]
+        assert store.migrate() == ["0001_initial", "0002_historic_sne"]
         assert store.migrate() == []  # nothing pending the second time
         assert store.count() == 0
+        assert store.count_historic() == 0
         assert store.meta().schema_version == 1
+        assert store.meta().last_historic_sync_at is None
 
 
 def test_migrate_creates_the_documented_indexes(config, store):
@@ -75,6 +90,8 @@ def test_migrate_creates_the_documented_indexes(config, store):
 
     assert "tns_objects_ra_dec_idx" in names
     assert "tns_objects_name_idx" in names
+    assert "tns_historic_sne_ra_dec_idx" in names
+    assert "tns_historic_sne_name_idx" in names
 
 
 def test_a_migration_edited_after_release_is_refused(config, store):
@@ -105,6 +122,68 @@ def test_a_custom_table_name_is_honoured(tmp_path):
     finally:
         with psycopg.connect(DSN, autocommit=True) as conn:
             conn.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
+
+
+# --- the historic table -----------------------------------------------------
+
+
+def test_replace_historic_writes_verbatim_columns_and_freshness(config, store):
+    store.replace_historic(
+        [
+            historic(
+                6568,
+                "SN2015bh",
+                obj_type="SN IIn",
+                host_name="NGC2770",
+                discovery_mag_flux="19.1",
+                discovery_date_ut="2015-02-07 00:00:00.000",
+                remarks="[Discoverer=Howerton, Drake et al.; DiscoveryRef=CBET 4229]",
+                tns_at="0",
+                public="1",
+            )
+        ],
+        snapshot=date(2026, 9, 22),
+    )
+
+    assert store.count_historic() == 1
+    assert store.meta().last_historic_sync_at is not None
+    with psycopg.connect(DSN, autocommit=True) as conn:
+        row = conn.execute(
+            f"SELECT name, ra, ra_hms, obj_type, redshift, discovery_mag_flux, remarks, "
+            f"source_snapshot FROM {config.database.schema}.tns_historic_sne"
+        ).fetchone()
+    assert row[0] == "SN2015bh"
+    assert row[1] == pytest.approx(137.396)
+    assert row[2] == "09:09:35.059"
+    assert row[3] == "SN IIn"
+    assert row[4] is None  # empty cell -> NULL, not ''
+    assert row[5] == "19.1"  # text, exactly as TNS exported it
+    assert "CBET 4229" in row[6]
+    assert row[7] == date(2026, 9, 22)
+
+
+def test_the_two_tables_are_written_independently(store):
+    # A full snapshot must never wipe the historic rows, nor the reverse.
+    store.replace_historic([historic(1, "SN1885A")], snapshot=date(2026, 9, 22))
+    store.replace([record(10001, "AT2026a")], snapshot=date(2026, 9, 22))
+    assert store.count_historic() == 1
+    assert store.count() == 1
+
+    store.replace_historic([historic(2, "SN1895B")], snapshot=date(2026, 9, 29))
+    assert store.count_historic() == 1
+    assert store.count() == 1
+
+    meta = store.meta()
+    assert meta.last_full_sync_at is not None
+    assert meta.last_historic_sync_at is not None
+
+
+def test_replace_historic_is_a_full_swap(store):
+    both = [historic(1, "SN1885A"), historic(2, "SNgone")]
+    store.replace_historic(both, snapshot=date(2026, 9, 22))
+    store.replace_historic([historic(1, "SN1885A")], snapshot=date(2026, 9, 29))
+
+    assert store.count_historic() == 1
 
 
 # --- the full snapshot ------------------------------------------------------

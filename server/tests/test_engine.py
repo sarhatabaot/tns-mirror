@@ -7,8 +7,16 @@ from datetime import UTC, datetime
 import pytest
 import requests
 
-from tns_mirror_server.adapters.memory import FakeSource, MemoryStore
-from tns_mirror_server.engine import catch_up, delta_sync, full_sync, snapshot_for_hour
+from tns_mirror_server.adapters.memory import FakeHistoricSource, FakeSource, MemoryStore
+from tns_mirror_server.engine import (
+    catch_up,
+    delta_sync,
+    full_sync,
+    historic_sync,
+    snapshot_for_hour,
+)
+from tns_mirror_server.errors import SourceError
+from tns_mirror_server.ports.historic import HistoricRecord
 from tns_mirror_server.ports.source import TnsRecord
 
 NOW = datetime(2026, 7, 26, 11, 30, tzinfo=UTC)
@@ -16,6 +24,12 @@ NOW = datetime(2026, 7, 26, 11, 30, tzinfo=UTC)
 
 def record(objid: int | None, name: str, ra: float = 1.0, dec: float = 2.0) -> TnsRecord:
     return TnsRecord(objid=objid, name=name, ra=ra, dec=dec)
+
+
+def historic(objid: int | None, name: str) -> HistoricRecord:
+    return HistoricRecord(
+        objid=objid, name=name, ra=1.0, dec=2.0, ra_hms="00:04:00", dec_dms="+02:00:00"
+    )
 
 
 # --- full snapshot ----------------------------------------------------------
@@ -235,3 +249,68 @@ def test_results_describe_themselves_for_the_operator():
 
     catchup = catch_up(store, FakeSource(deltas={11: [record(1, "AT1")]}), 1, end_hour=11)
     assert "catch-up over 1h" in catchup.describe()
+
+
+# --- historic SNe -----------------------------------------------------------
+
+
+def test_historic_sync_swaps_its_own_table_and_leaves_the_catalogue_alone():
+    store = MemoryStore()
+    store.rows = {10001: record(10001, "AT2026a")}
+    store.historic_rows = {999: historic(999, "SNgone")}
+
+    source = FakeHistoricSource([historic(1, "SN1885A"), historic(2, "SN1895B")])
+    result = historic_sync(store, source)
+
+    assert result.kind == "historic"
+    assert result.rows_written == 2
+    assert set(store.historic_rows) == {1, 2}  # the stale row is gone
+    assert set(store.rows) == {10001}  # the catalogue was not touched
+    assert store.replace_historic_calls == 1
+    assert store.replace_calls == 0
+    assert "historic SNe" in result.describe()
+
+
+def test_historic_sync_drops_rows_with_no_stable_id_and_counts_them():
+    store = MemoryStore()
+
+    source = FakeHistoricSource([historic(None, "SN?"), historic(1, "SN1885A")])
+    result = historic_sync(store, source)
+
+    assert result.rows_written == 1
+    assert result.rows_skipped == 1
+
+
+def test_historic_sync_refuses_to_replace_with_nothing():
+    # A search whose parameters TNS renamed would match zero objects and return
+    # a header alone. That must never wipe the table (invariant 7).
+    store = MemoryStore()
+    store.historic_rows = {1: historic(1, "SN1885A")}
+
+    with pytest.raises(SourceError, match="zero usable rows"):
+        historic_sync(store, FakeHistoricSource([]))
+
+    assert store.count_historic() == 1
+    assert store.replace_historic_calls == 0
+
+
+def test_historic_sync_fetches_before_writing_and_can_reuse_the_export():
+    store = MemoryStore()
+    source = FakeHistoricSource(SourceError("network down"))
+
+    with pytest.raises(SourceError):
+        historic_sync(store, source)
+    assert store.replace_historic_calls == 0  # network failure never reached the store
+
+    source = FakeHistoricSource([historic(1, "SN1885A")])
+    historic_sync(store, source, reuse_existing=True)
+    assert source.fetches == [True]
+
+
+def test_historic_freshness_is_reported_separately():
+    store = MemoryStore()
+    historic_sync(store, FakeHistoricSource([historic(1, "SN1885A")]))
+
+    meta = store.meta()
+    assert meta.last_historic_sync_at is not None
+    assert meta.last_full_sync_at is None  # not conflated with the catalogue

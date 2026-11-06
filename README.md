@@ -8,6 +8,11 @@ delta files. `tns-mirror` downloads them, authenticates properly, and keeps a
 Postgres table in sync — so you can cone-search, cross-match, and join against
 TNS **offline**, without putting a rate-limited public API on your hot path.
 
+It also mirrors the **pre-2016 supernovae** (SN 1885A – SN 2015bh, the list TNS
+inherited from the CBAT), which TNS keeps out of its staged files and serves only
+through its search page. They land in their own table, `tns_historic_sne`, with
+TNS's columns kept verbatim, refreshed weekly.
+
 > **This is not an official TNS service.** It is an independently-operated mirror
 > *of* the TNS public catalogue. TNS's data-use terms and citation requirements
 > apply to the data — see [Attribution](#attribution).
@@ -56,11 +61,13 @@ snapshot, and then follows the schedule. Check on it:
 
 ```console
 $ docker compose exec server tns-mirror-server status
-schema_version:       1
-rows:                 168423
-last_full_sync_at:    2026-07-26 00:04:11+00
-last_delta_sync_at:   2026-07-26 11:10:38+00
-last_source_snapshot: 2026-07-26
+schema_version:        1
+rows:                  168423
+historic_rows:         6568
+last_full_sync_at:     2026-07-26 00:04:11+00
+last_delta_sync_at:    2026-07-26 11:10:38+00
+last_historic_sync_at: 2026-07-20 03:02:47+00
+last_source_snapshot:  2026-07-26
 ```
 
 Then create a reader for your application:
@@ -124,6 +131,7 @@ tns-mirror-server migrate            # create or upgrade the schema
 tns-mirror-server sync               # daily full snapshot
 tns-mirror-server sync --hour 14     # one hourly delta
 tns-mirror-server catch-up 24        # trailing 24-hour delta window
+tns-mirror-server sync-historic      # the pre-2016 SNe, into tns_historic_sne
 tns-mirror-server serve              # run continuously on the schedule
 tns-mirror-server status [--max-age-hours 26]
 tns-mirror-server print-grants --database tnsdb
@@ -138,6 +146,7 @@ and skip the scheduler entirely:
 | full snapshot | `0 0 * * *` | `sync` |
 | hourly delta | `10 * * * *` | `catch-up 1` |
 | gap repair | `30 0 * * *` | `catch-up 24` |
+| historic SNe | `0 3 * * 0` | `sync-historic` |
 
 Schedules are UTC because TNS stages its hourly files on UT hours; a local-time
 schedule drifts off them twice a year.
