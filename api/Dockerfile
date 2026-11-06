@@ -6,6 +6,10 @@
 # credentials and is not exposed; this is the only piece that faces the network,
 # and it connects with the read-only role.
 
+# --- uv ---------------------------------------------------------------------
+# A separate stage so Dependabot can bump it; only the binary is copied out.
+FROM ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa AS uv
+
 # --- builder ----------------------------------------------------------------
 FROM cgr.dev/chainguard/wolfi-base@sha256:8acb3a7694eda954b3ad4256aec3291bdd92715d7a8c030abd1a21546337b4e4 AS builder
 
@@ -24,22 +28,20 @@ RUN apk add --no-cache \
     ncurses-terminfo-base=6.6.20261031-r0 \
     ncurses=6.6.20261031-r0 \
     py3-pip-wheel=26.2.2-r2 \
-    py3.13-pip-base=26.2.2-r2 \
-    py3.13-pip=26.2.2-r2 \
-    py3.13-setuptools=84.2.1-r0 \
     python-3.13-base=3.13.18_git20261030-r0 \
     python-3.13=3.13.18_git20261030-r0 \
     readline=8.3-r3 \
     sqlite-libs=3.54.1-r0 \
     xz=5.8.4-r1
 
+# Bytecode is compiled here because the runtime never writes it, so without this
+# every process, healthchecks included, would recompile on start.
 ENV UV_LINK_MODE=copy \
     UV_PYTHON=/usr/bin/python3.13 \
     UV_PROJECT_ENVIRONMENT=/app/.venv \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    UV_COMPILE_BYTECODE=1
 
-RUN pip install --no-cache-dir --break-system-packages "uv==0.11.28"
+COPY --from=uv /uv /usr/bin/uv
 
 WORKDIR /build
 

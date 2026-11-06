@@ -17,6 +17,8 @@ schema change bumps the major on both.
 ### Changed
 
 - No image stage installs a compiler any more, because every dependency has a prebuilt wheel.
+- The builder copies `uv` from Astral's image, pinned by version and digest, instead of installing it with pip, so it no longer needs pip.
+- Bytecode is compiled at build time, so processes no longer recompile on each start. This adds about 4 MB to the server image and 34 MB to the API image.
 
 ### Security
 

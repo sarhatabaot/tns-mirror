@@ -70,7 +70,7 @@ uv build
 
 ```sh
 docker run --rm cgr.dev/chainguard/wolfi-base@sha256:<digest> \
-  apk add --no-cache --simulate python-3.13 py3.13-pip   # builder
+  apk add --no-cache --simulate python-3.13              # builder
 docker run --rm cgr.dev/chainguard/wolfi-base@sha256:<digest> \
   apk add --no-cache --simulate python-3.13 tzdata       # runtime
 ```
