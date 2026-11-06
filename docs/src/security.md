@@ -11,11 +11,10 @@ tags: docs
 ## No baked identity
 
 The published image contains **no TNS credential**. A `tns_marker` and a bot
-`api_key` identify a *specific TNS account*, so shipping one would mean everyone
+`api_key` identify a *specific person or account*, so shipping one would mean everyone
 running the image was impersonating its author.
 
-Each deployer registers their own account or bot and supplies it as
-configuration. The repository's `.env.example` carries only obvious placeholders,
+Each deployer supplies their own as configuration. The repository's `.env.example` carries only obvious placeholders,
 and Gitleaks plus secret push-protection guard against a real one slipping in.
 
 There is no anonymous fallback: with no credential configured, the download

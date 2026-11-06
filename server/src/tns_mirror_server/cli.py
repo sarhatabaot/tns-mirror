@@ -1,6 +1,6 @@
 """``tns-mirror-server`` — the command-line entrypoint.
 
-Design §5.4 and A.6. One-shot commands are the primitive:
+One-shot commands are the primitive:
 
     tns-mirror-server migrate           apply schema migrations
     tns-mirror-server sync              full snapshot (daily)
@@ -136,7 +136,7 @@ def cmd_status(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_print_grants(config: Config, args: argparse.Namespace) -> int:
-    """Emit least-privilege SQL for a consumer role (design §4.4).
+    """Emit least-privilege SQL for a consumer role.
 
     Deliberately does *not* include ``ALTER DEFAULT PRIVILEGES``: that would
     grant the reader SELECT on every future table in the schema, which is a

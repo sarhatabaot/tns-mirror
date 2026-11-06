@@ -1,7 +1,7 @@
 """The ``Source`` port: where catalogue rows come from.
 
 Everything that touches the network sits behind this protocol so the sync engine
-is both auth-agnostic (design §5.0) and network-free in tests.
+is both auth-agnostic and network-free in tests.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ class Source(Protocol):
     ``download`` fetches one file — the full snapshot when ``hour`` is ``None``,
     otherwise that hour's delta — and returns a local path. ``parse`` turns that
     path into records. Splitting them keeps network I/O outside the database
-    transaction (design A.2).
+    transaction.
     """
 
     #: Seconds to wait between consecutive downloads, to stay under TNS's rate limit.
@@ -80,7 +80,7 @@ class Source(Protocol):
 #
 # TNS is the only shipped source, but the engine is provider-agnostic, so the
 # registry keeps the door open for another bulk-CSV catalogue without touching
-# the engine (design §3).
+# the engine.
 
 _SOURCES: dict[str, Callable[..., Source]] = {}
 

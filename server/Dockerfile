@@ -111,5 +111,5 @@ CMD ["serve"]
 LABEL org.opencontainers.image.title="tns-mirror-server" \
       org.opencontainers.image.description="Mirror the TNS public objects catalogue into SQL." \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.source="https://github.com/tns-mirror/tns-mirror" \
+      org.opencontainers.image.source="https://github.com/sarhatabaot/tns-mirror" \
       io.tns-mirror.schema-version="1"

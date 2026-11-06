@@ -1,6 +1,6 @@
 """Postgres implementation of the ``Store`` port.
 
-Design §4 and A.3. This module is the only place in the service that knows SQL or
+This module is the only place in the service that knows SQL or
 the table name — everything above it speaks :class:`TnsRecord`.
 
 Invariant 3 rests on :meth:`replace` being a *single* transaction: the DELETE and

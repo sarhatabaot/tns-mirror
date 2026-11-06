@@ -1,6 +1,6 @@
 """The ``Store`` port: the only place that knows SQL or the table name.
 
-Design §3. An in-memory fake implements this same protocol so the engine's tests
+An in-memory fake implements this same protocol so the engine's tests
 need no database.
 """
 

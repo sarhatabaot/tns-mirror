@@ -250,7 +250,7 @@ def test_local_commands_work_without_a_tns_credential(monkeypatch, tmp_path, cap
 def test_download_commands_still_refuse_without_a_credential(
     monkeypatch, tmp_path, argv, caplog
 ):
-    """Invariant 4: authenticated to TNS, or no download. Checked up front."""
+    """Invariant 4: identified to TNS, or no download. Checked up front."""
     from contextlib import contextmanager
 
     @contextmanager

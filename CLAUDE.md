@@ -1,8 +1,6 @@
 # tns-mirror — working rules
 
-A TNS→SQL mirror. Two artifacts from one repo: `tns-mirror-server` (Docker image,
-owns and writes the database) and `tns-mirror-client` (PyPI, v0.2, reads it).
-`schema/` is the contract between them.
+A TNS→SQL mirror. Three artifacts from one repo: `tns-mirror-server` (Docker image, owns and writes the database), `tns-mirror-client` (PyPI, reads it), and the optional `tns-mirror-api` (Docker image, read-only HTTP in front of the client). `schema/` is the contract between the server and its readers.
 
 These are the project's rules. [`AGENTS.md`](AGENTS.md) is the general working
 baseline for any agent; where the two conflict, this file wins.
@@ -17,7 +15,7 @@ baseline for any agent; where the two conflict, this file wins.
 3. **Effectively-once, atomic refresh.** The full snapshot is delete-then-insert
    in **one transaction**. Do not split it. Deltas upsert on `objid` and are
    idempotent.
-4. **Authenticated to TNS, never anonymous.** A marker or a bot `api_key` must be
+4. **Identified to TNS, never anonymous.** A marker or a bot `api_key` must be
    configured; with neither, the download refuses. No anonymous fallback, ever.
 5. **Least privilege.** The server holds write credentials to its own database
    only. Consumers get a distinct read-only role. The database is not

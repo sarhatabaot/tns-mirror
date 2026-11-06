@@ -1,6 +1,6 @@
 """Forward-only SQL migrations, without an ORM.
 
-Design §8. The mirror is a headless sync job; a full migration framework would be
+The mirror is a headless sync job; a full migration framework would be
 more attack surface than the problem deserves. This runner does exactly four
 things: find numbered ``.sql`` files, apply the ones not yet applied, record them
 with a checksum, and refuse to continue if a file changed after it was applied.

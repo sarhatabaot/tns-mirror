@@ -20,7 +20,9 @@ from tns_mirror_server.config import (
     DownloadConfig,
 )
 
-TNS_URL = "https://www.wis-tns.org/system/files/tns_public_objects/tns_public_objects.csv.zip"
+TNS_URL = (
+    "https://www.wis-tns.org/sites/default/files/tns_public_objects/tns_public_objects.csv.zip"
+)
 
 # A realistic TNS export: a preamble line, then the header, then rows.
 SAMPLE_CSV = """\

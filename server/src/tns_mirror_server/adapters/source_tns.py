@@ -1,6 +1,6 @@
 """The TNS public-objects source: download and parse.
 
-Design §5.0 and A.1. The download is streamed to a temporary file and renamed
+The download is streamed to a temporary file and renamed
 into place, so a truncated transfer can never be mistaken for a catalogue. The
 header scan is alias-based because TNS has shipped several column spellings over
 the years and a rename upstream should degrade to "column absent", not "mirror
@@ -106,7 +106,7 @@ class TnsPublicObjects:
         self._session = session or requests.Session()
         self.download_throttle_seconds = config.download.throttle_seconds
 
-    # --- authentication (§5.0) ---------------------------------------------
+    # --- authentication ---------------------------------------------
 
     def _tns_marker(self) -> str:
         """The ``tns_marker`` User-Agent TNS uses to attribute a request."""
@@ -201,6 +201,12 @@ class TnsPublicObjects:
         original ``HTTPError`` reaches it.
         """
         if response.status_code in (401, 403):
+            if "/system/files/" in response.url:
+                raise SourceError(
+                    f"HTTP {response.status_code} from TNS for {response.url}. TNS moved "
+                    f"these files to /sites/default/files/ and now rejects the old path, "
+                    f"whatever the credentials. Update TNS_URL or download.url."
+                )
             mode = self._config.auth.mode
             if mode == "bot":
                 detail = (
@@ -211,9 +217,8 @@ class TnsPublicObjects:
                 )
             else:
                 detail = (
-                    "TNS rejected the marker. Check TNS_USER_AGENT is the "
-                    "tns_marker for a registered account, copied whole, "
-                    "including the surrounding braces."
+                    "TNS rejected the marker. Check TNS_USER_AGENT is a "
+                    "complete tns_marker, including the surrounding braces."
                 )
             raise SourceError(f"HTTP {response.status_code} from TNS. {detail}")
 

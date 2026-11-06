@@ -13,22 +13,26 @@ the compose file below pulls the published image.
 
 ## 1. Get a TNS credential
 
-**The mirror never downloads anonymously.** TNS access is per-account, and with
-no credential the server stops with a message rather than hammering TNS as an
-unknown client. This step is not optional.
+**The mirror never downloads anonymously.** TNS requires a `tns_marker` on every download, and with no credential the server stops with a message rather than hammering TNS as an unknown client. This step is not optional.
 
-Register at [wis-tns.org]({{ site.tns }}), then take **one** of:
+Use a marker unless you already have a reason to use a bot.
 
-**Marker** — the simplest, and what every account has:
+**Marker** — the default. With no TNS account, use the `guest` form with your full name:
 
 ```text
-tns_marker{"tns_id":"1234","type":"user","name":"your_username"}
+tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}
 ```
 
-**Bot** — create one under *Bot Management* in your TNS profile, for an
+With an account, use your own id and username:
+
+```text
+tns_marker{"tns_id":1234,"type":"user","name":"your_username"}
+```
+
+**Bot** — optional. Create one under *Bot Management* in your TNS profile, for an
 `api_key`, a bot id and a bot name.
 
-Either works. The marker is sent on a `GET`; the bot path submits its `api_key`
+Either works, and a bot needs `TNS_AUTH_MODE=bot` as well. The marker is sent on a `GET`; the bot path submits its `api_key`
 as form data on a `POST`.
 
 ## 2. Save this as `docker-compose.yml`
@@ -108,13 +112,12 @@ The two edits look like this:
 
 ```yaml
 POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-paste-the-openssl-output-here}
-TNS_USER_AGENT: 'tns_marker{"tns_id":"1234","type":"user","name":"your_username"}'
+TNS_USER_AGENT: 'tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}'
 ```
 
 <div class="callout" data-callout="warning">
 
-**A `tns_marker` or bot `api_key` identifies *your* TNS account.** If you put one
-directly in the compose file, do not commit that file to a public repository. To
+**A `tns_marker` or bot `api_key` identifies *you*.** If you put one directly in the compose file, do not commit that file to a public repository. To
 keep credentials out of it entirely, see [.env](#prefer-a-env-file) below.
 
 </div>
@@ -217,8 +220,7 @@ It uses the reader you just created — set `TNS_RO_PASSWORD` to that password.
 ## Just give me the smallest thing that works
 
 [`docker-compose.minimal.yml`]({{ site.repository }}/blob/main/quickstart/docker-compose.minimal.yml)
-is the same setup with nothing optional in it, using a **TNS bot**. Replace the
-four `CHANGE-ME` values and run it:
+is the same setup with almost nothing optional in it. Replace `YOUR_FULL_NAME` and the two `CHANGE-ME` passwords, and run it:
 
 ```yaml
 name: tns-mirror
@@ -238,15 +240,12 @@ services:
       retries: 20
 
   server:
-    image: sarhatabaot/tns-mirror-server:1.0.4
+    image: sarhatabaot/tns-mirror-server:1.0.5
     depends_on:
       db:
         condition: service_healthy
     environment:
-      TNS_AUTH_MODE: bot
-      TNS_API_KEY: CHANGE-ME
-      TNS_BOT_ID: CHANGE-ME
-      TNS_BOT_NAME: CHANGE-ME
+      TNS_USER_AGENT: 'tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}'
       PGHOST: db
       PGUSER: tns_writer
       PGPASSWORD: CHANGE-ME
@@ -263,10 +262,7 @@ volumes:
 $ docker compose -f docker-compose.minimal.yml up -d
 ```
 
-**Bot mode needs all three values.** The `api_key` authenticates the request;
-the id and name say which bot is asking. Supply only the key and the server
-refuses, naming what is missing. All three come from *Bot Management* in your
-TNS profile.
+**To use a bot instead**, set `TNS_AUTH_MODE: bot` with `TNS_API_KEY`, `TNS_BOT_ID` and `TNS_BOT_NAME`. Supply only the key and the server refuses, naming what is missing. All three come from *Bot Management* in your TNS profile.
 
 The healthcheck is not decoration: the server does not retry a database that is
 not up yet, so `depends_on` needs something to wait on.
@@ -279,7 +275,7 @@ compose file is in version control and the credentials are not:
 
 ```bash
 POSTGRES_PASSWORD=paste-the-openssl-output-here
-TNS_USER_AGENT=tns_marker{"tns_id":"1234","type":"user","name":"your_username"}
+TNS_USER_AGENT=tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}
 ```
 
 Leave the compose file exactly as published, and `docker compose up -d`.

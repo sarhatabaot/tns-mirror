@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tns-mirror-server"
-version = "1.0.4"
+version = "1.0.5"
 description = "Mirror the IAU Transient Name Server public objects catalogue into SQL."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -25,7 +25,7 @@ classifiers = [
 
 # Deliberately small: a downloader, a Postgres driver, a config parser. No web
 # framework and no ORM — this is a headless sync job, and every dependency is
-# attack surface in a published image (design §8).
+# attack surface in a published image.
 dependencies = [
   "requests>=2.32.3",
   "psycopg[binary]>=3.3.4",
@@ -60,7 +60,7 @@ src = ["src", "tests"]
 select = ["E", "F", "W", "I", "UP", "B", "S", "C4", "SIM", "RUF"]
 ignore = [
   # 'type' shadows a builtin, but it is a schema column name and the record must
-  # use the contract's vocabulary (design §4.1).
+  # use the contract's vocabulary.
   "A003",
 ]
 

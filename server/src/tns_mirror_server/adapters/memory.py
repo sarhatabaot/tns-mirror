@@ -1,6 +1,6 @@
 """In-memory fakes for the ports.
 
-Design §3: every port has an in-memory fake so the engine's behaviour — atomic
+Every port has an in-memory fake so the engine's behaviour — atomic
 replace, idempotent delta, catch-up ordering, rate-limit backoff — is tested
 without a database or a network.
 """

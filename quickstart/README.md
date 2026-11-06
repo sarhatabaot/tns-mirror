@@ -1,6 +1,6 @@
 # Quickstart
 
-Run a TNS mirror in about five minutes. You need Docker, and a free TNS account.
+Run a TNS mirror in about five minutes. You need Docker and your full name, for the marker TNS requires.
 
 Take [`docker-compose.yml`](docker-compose.yml), change the two marked lines, and
 `docker compose up -d`. It pulls the published image, so there is no source
@@ -11,23 +11,26 @@ run it. A `.env` is optional, not required.
 
 ## 1. Get a TNS credential
 
-**The mirror never downloads anonymously.** TNS access is per-account, and with
-no credential the server refuses to sync rather than hammering TNS as an unknown
-client. So this step is not optional.
+**The mirror never downloads anonymously.** TNS requires a `tns_marker` on every download, and with no credential the server refuses to sync rather than hammering TNS as an unknown client. So this step is not optional.
 
-Register at [wis-tns.org](https://www.wis-tns.org/), then take **one** of:
+Use a marker unless you already have a reason to use a bot.
 
-**Marker** — the simplest, and what every account has. Your `tns_marker` string
-looks like:
+**Marker** — the default. With no TNS account, use the `guest` form with your full name:
 
-```
-tns_marker{"tns_id":"1234","type":"user","name":"your_username"}
+```text
+tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}
 ```
 
-**Bot** — create one under *Bot Management* in your TNS profile. You get an
+With an account, use your own id and username:
+
+```text
+tns_marker{"tns_id":1234,"type":"user","name":"your_username"}
+```
+
+**Bot** — optional. Create one under *Bot Management* in your TNS profile. You get an
 `api_key`, a bot id, and a bot name.
 
-Either works. The mirror sends the marker on a `GET`; the bot path submits the
+Either works, and a bot needs `TNS_AUTH_MODE=bot` as well. The mirror sends the marker on a `GET`; the bot path submits the
 `api_key` as form data on a `POST`.
 
 ## 2. Edit two lines
@@ -39,13 +42,12 @@ Open `docker-compose.yml`. Both edits are marked with a box:
 POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-paste-the-openssl-output-here}
 
 # EDIT 2 of 2 — your TNS credential
-TNS_USER_AGENT: 'tns_marker{"tns_id":"1234","type":"user","name":"your_username"}'
+TNS_USER_AGENT: 'tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}'
 ```
 
 Generate a password with `openssl rand -base64 24`.
 
-> **A `tns_marker` or bot `api_key` identifies *your* TNS account.** If you edit
-> the compose file directly, do not commit it to a public repository.
+> **A `tns_marker` or bot `api_key` identifies *you*.** If you edit the compose file directly, do not commit it to a public repository.
 
 ### Or keep credentials out of the file
 
@@ -140,15 +142,13 @@ Any language with a Postgres driver works too — see
 ## Just the minimum
 
 [`docker-compose.minimal.yml`](docker-compose.minimal.yml) is the same setup with
-nothing optional in it, using a **TNS bot**. Replace the four `CHANGE-ME` values
-and run:
+almost nothing optional in it. Put a database password and your `TNS_USER_AGENT` in a `.env` beside it, and run:
 
 ```console
 $ docker compose -f docker-compose.minimal.yml up -d
 ```
 
-Bot mode needs all three of `TNS_API_KEY`, `TNS_BOT_ID` and `TNS_BOT_NAME` — the
-key authenticates the request, the id and name identify which bot is asking.
+To use a bot instead, set `TNS_AUTH_MODE=bot` and all three of `TNS_API_KEY`, `TNS_BOT_ID` and `TNS_BOT_NAME`. The server refuses if any is missing.
 
 ## Optional: keyed HTTP access, in two tiers
 
@@ -195,7 +195,7 @@ $ curl -H "X-API-Key: k_9e04…" \
 
 [`docker-compose.full.yml`](docker-compose.full.yml) is all five services —
 database, sync server, both API tiers and the gateway — with no override files.
-Five values to edit, then `up -d`:
+Three values to edit, then `up -d`:
 
 ```console
 $ docker compose -f docker-compose.full.yml up -d

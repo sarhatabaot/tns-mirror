@@ -122,7 +122,7 @@ A change must not violate these.
 3. **Effectively-once, atomic refresh.** The full snapshot is delete-then-insert
    in one transaction. Do not split it. Deltas upsert on `objid` and are
    idempotent.
-4. **Authenticated to TNS, never anonymous.** No fallback, ever.
+4. **Identified to TNS, never anonymous.** No fallback, ever.
 5. **Least privilege.** Write credentials stay with the server. The database is
    not internet-exposed. The container runs non-root.
 6. **Self-contained.** Own lockfile, `.python-version`, Dockerfile, CI. No reach

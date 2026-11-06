@@ -14,16 +14,17 @@
 # Consumers all use ONE url. Their X-API-Key picks the tier, so a project is
 # promoted, demoted or revoked by editing nginx/tns-api-keys.map and reloading.
 #
-# ── FIVE VALUES TO EDIT, then three commands ───────────────────────────────
+# ── THREE VALUES TO EDIT, then three commands ──────────────────────────────
 #
 # Put them in a .env beside this file, or edit the defaults inline — both
 # work, and .env wins. Anything still saying CHANGE-ME is not yet configured.
 #
 #   POSTGRES_PASSWORD    openssl rand -base64 24
 #   TNS_RO_PASSWORD      openssl rand -base64 24     (a different one)
-#   TNS_API_KEY  \
-#   TNS_BOT_ID    ├─ Bot Management, https://www.wis-tns.org/
-#   TNS_BOT_NAME /
+#   TNS_USER_AGENT       tns_marker{"tns_id":0,"type":"guest","name":"YOUR_FULL_NAME"}
+#
+# To use a bot instead, set TNS_AUTH_MODE=bot, TNS_API_KEY, TNS_BOT_ID and
+# TNS_BOT_NAME. They come from Bot Management, https://www.wis-tns.org/
 #
 #   1.  cp nginx/tns-api-keys.map.example nginx/tns-api-keys.map
 #       chmod 600 nginx/tns-api-keys.map        # then put real keys in it
@@ -71,12 +72,15 @@ services:
 
   # The only writer. Downloads from TNS and owns the schema.
   server:
-    image: sarhatabaot/tns-mirror-server:${TNS_MIRROR_VERSION:-1.0.4}
+    image: sarhatabaot/tns-mirror-server:${TNS_MIRROR_VERSION:-1.0.5}
     depends_on:
       db:
         condition: service_healthy
     environment:
-      TNS_AUTH_MODE: ${TNS_AUTH_MODE:-bot}
+      TNS_AUTH_MODE: ${TNS_AUTH_MODE:-marker}
+      TNS_USER_AGENT: ${TNS_USER_AGENT:-}
+      # Optional: to use a bot instead, set TNS_AUTH_MODE to "bot" and all three
+      # of these.
       TNS_API_KEY: ${TNS_API_KEY:-}
       TNS_BOT_ID: ${TNS_BOT_ID:-}
       TNS_BOT_NAME: ${TNS_BOT_NAME:-}
@@ -97,7 +101,7 @@ services:
   # ── capped tier ───────────────────────────────────────────────────────────
   # What everyone gets unless their key says otherwise.
   api:
-    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.4}
+    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.5}
     depends_on:
       db:
         condition: service_healthy
@@ -138,7 +142,7 @@ services:
   # that actually binds a loader is the connection pool, and a pool cannot be
   # divided per caller. Separate containers cannot starve each other.
   api-batch:
-    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.4}
+    image: sarhatabaot/tns-mirror-api:${TNS_MIRROR_VERSION:-1.0.5}
     depends_on:
       db:
         condition: service_healthy

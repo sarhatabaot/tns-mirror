@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Audit both packages' locked dependency sets for known vulnerabilities.
+# Audit each package's locked dependency set for known vulnerabilities.
 #
 # The server is pinned to its .python-version rather than whatever Python happens
 # to be on PATH: a single-version lockfile exported under a different interpreter
