@@ -124,6 +124,7 @@ uvx pre-commit run --all-files --hook-stage manual   # everything CI runs
 
 - Inspect status before editing; preserve unrelated changes. Never reset, clean, discard, or overwrite unfamiliar work without authorization. Review diffs and stage only task-owned files.
 - **Local commits are allowed but not required** for completed, verified tasks. Use focused, descriptive commits; do not amend another contributor's commits without authorization.
+- Do not attribute AI tools or agents in commit messages or pull request descriptions: no `Co-Authored-By` trailer for an agent and no "Generated with" line.
 - Incomplete checkpoint commits are permitted only when explicitly requested or necessary for a clearly identified recovery/handoff; label them as incomplete.
 - **Explicit approval is required** for pushing, creating pull requests, merging, rewriting remote history, or other consequential remote operations.
 - Prefer separate Git worktrees for concurrent agents, while supporting coordinated shared workspaces. Each worktree may have its own `.venv` and share uv's package cache.

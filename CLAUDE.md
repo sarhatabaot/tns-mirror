@@ -78,6 +78,8 @@ not derived from `VERSION`; the check enforces that they match. Tags are bare
 
 ## Conventions
 
+- No AI or agent attribution in commit messages or pull request descriptions: no
+  `Co-Authored-By` trailer for an agent, no "Generated with" line.
 - Python ≥ 3.13, uv, hatchling, ruff (lint + format).
 - Dependencies are attack surface in a published image. The current set is
   `requests`, `psycopg`, `PyYAML`. Adding a fourth needs a reason; the cron
