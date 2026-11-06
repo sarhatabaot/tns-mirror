@@ -63,8 +63,18 @@ uv build
 
 `server/Dockerfile` and `api/Dockerfile` are the images. Keep what they already do:
 
-- Multi-stage builds on **Wolfi** (`cgr.dev/chainguard/wolfi-base`), with no build tools, caches or unnecessary packages in the final stage.
+- Multi-stage builds on **Wolfi** (`cgr.dev/chainguard/wolfi-base`), which is required, with no build tools, caches or unnecessary packages in any stage. Dependencies install from wheels; a dependency without one needs a decision, not a quiet return of compilers.
 - Base images pinned by **digest**. A bare digest is deliberate here and is stricter than a version tag; Dependabot updates it.
+- Every `apk` package pinned to an exact version, transitive ones included. Wolfi's repository is rolling, so an unpinned package can outrun the pinned base. Hadolint's DL3018 enforces this for the packages a Dockerfile names; do not suppress it.
+- To update, take the new base digest, list what each stage's packages resolve to, and replace the pins with that output. Dependabot bumps only the digest, and Trivy fails CI when a pinned package needs a security fix, so either can be what prompts this:
+
+```sh
+docker run --rm cgr.dev/chainguard/wolfi-base@sha256:<digest> \
+  apk add --no-cache --simulate python-3.13 py3.13-pip   # builder
+docker run --rm cgr.dev/chainguard/wolfi-base@sha256:<digest> \
+  apk add --no-cache --simulate python-3.13 tzdata       # runtime
+```
+
 - A non-root runtime user, minimal privileges, and no secrets in images or layers.
 - The narrow build contexts, `server/` and `api/`. Nothing inside an image can reach the repository root.
 

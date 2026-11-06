@@ -7,10 +7,31 @@
 # and it connects with the read-only role.
 
 # --- builder ----------------------------------------------------------------
-FROM cgr.dev/chainguard/wolfi-base@sha256:003627df3c1e1bba0c4116afcddb314aca9594ee2328c7e876a8081a6c988b2e AS builder
+FROM cgr.dev/chainguard/wolfi-base@sha256:8acb3a7694eda954b3ad4256aec3291bdd92715d7a8c030abd1a21546337b4e4 AS builder
 
-# hadolint ignore=DL3018
-RUN apk add --no-cache python-3.13 python-3.13-dev py3.13-pip build-base
+# Wolfi's package repository is rolling, so a pinned base does not pin what apk
+# installs. Every package added here is pinned, including transitive ones, or a
+# newer Python can require a newer glibc than the base has. Move these and the
+# base digest together: see "Containers" in AGENTS.md.
+RUN apk add --no-cache \
+    gdbm=1.26-r9 \
+    libbz2-1=1.0.8-r30 \
+    libexpat1=2.10.0-r1 \
+    libffi=3.8.0-r2 \
+    libstdc++=16.2.0-r2 \
+    libuuid=2.42.4-r2 \
+    mpdecimal=4.0.1-r6 \
+    ncurses-terminfo-base=6.6.20261031-r0 \
+    ncurses=6.6.20261031-r0 \
+    py3-pip-wheel=26.2.2-r2 \
+    py3.13-pip-base=26.2.2-r2 \
+    py3.13-pip=26.2.2-r2 \
+    py3.13-setuptools=84.2.1-r0 \
+    python-3.13-base=3.13.18_git20261030-r0 \
+    python-3.13=3.13.18_git20261030-r0 \
+    readline=8.3-r3 \
+    sqlite-libs=3.54.1-r0 \
+    xz=5.8.4-r1
 
 ENV UV_LINK_MODE=copy \
     UV_PYTHON=/usr/bin/python3.13 \
@@ -31,11 +52,26 @@ COPY src/ ./src/
 RUN uv sync --frozen --no-dev --no-editable
 
 # --- runtime ----------------------------------------------------------------
-FROM cgr.dev/chainguard/wolfi-base@sha256:003627df3c1e1bba0c4116afcddb314aca9594ee2328c7e876a8081a6c988b2e AS runtime
+FROM cgr.dev/chainguard/wolfi-base@sha256:8acb3a7694eda954b3ad4256aec3291bdd92715d7a8c030abd1a21546337b4e4 AS runtime
 
 # tzdata: psycopg resolves the server timezone, and everything here is UTC.
-# hadolint ignore=DL3018
-RUN apk add --no-cache python-3.13 tzdata
+RUN apk add --no-cache \
+    gdbm=1.26-r9 \
+    libbz2-1=1.0.8-r30 \
+    libexpat1=2.10.0-r1 \
+    libffi=3.8.0-r2 \
+    libstdc++=16.2.0-r2 \
+    libuuid=2.42.4-r2 \
+    mpdecimal=4.0.1-r6 \
+    ncurses-terminfo-base=6.6.20261031-r0 \
+    ncurses=6.6.20261031-r0 \
+    py3-pip-wheel=26.2.2-r2 \
+    python-3.13-base=3.13.18_git20261030-r0 \
+    python-3.13=3.13.18_git20261030-r0 \
+    readline=8.3-r3 \
+    sqlite-libs=3.54.1-r0 \
+    tzdata=2026f-r0 \
+    xz=5.8.4-r1
 
 RUN addgroup -g 10001 -S tns \
     && adduser -u 10001 -S -G tns -h /home/tns tns

@@ -184,8 +184,7 @@ download refuses** rather than falling back to an anonymous request.
   else — verified by an integration test that asserts the reader is denied
   `INSERT`, `UPDATE`, `DELETE`, and `DROP`.
 - **Not internet-exposed.** The compose file does not publish the database port.
-- **Hardened image.** Multi-stage Wolfi, digest-pinned, compilers only in the
-  builder, runs as uid 10001, read-only root filesystem, `no-new-privileges`.
+- **Hardened image.** Multi-stage Wolfi, with a digest-pinned base and version-pinned packages, no compiler in any stage, runs as uid 10001, read-only root filesystem, `no-new-privileges`.
 - **Layered scanning**, all gating the merge: Gitleaks, Bandit, Semgrep,
   pip-audit, Trivy (filesystem and image), Hadolint, plus CodeQL, Dependabot and
   secret push-protection. Every suppression carries a justification *and* an

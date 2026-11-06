@@ -60,10 +60,8 @@ implementation detail shared with named consumers, not something to expose.
 
 ## Image hardening
 
-- Multi-stage **Wolfi** build; compilers and build tooling exist only in the
-  builder stage.
-- Base images are **digest-pinned**, so a rebuild cannot silently pick up a
-  different image.
+- Multi-stage **Wolfi** build. Dependencies install from prebuilt wheels, so no stage has a compiler.
+- Base images are **digest-pinned** and every `apk` package is **version-pinned**, so a rebuild cannot silently pick up different ones.
 - Runs as **non-root** (uid 10001).
 - Compose runs it with a **read-only root filesystem** and `no-new-privileges`.
 - Debugging tools live in an ephemeral sidecar, never baked into the production
