@@ -164,8 +164,7 @@ depends on exists in exactly one place rather than once per consumer.
 
 - **Tags:** `1.0.4`, `1.0`, `latest`
 - **Platforms:** `linux/amd64`, `linux/arm64`
-- **Base:** multi-stage [Wolfi](https://github.com/wolfi-dev), digest-pinned;
-  compilers exist only in the builder stage
+- **Base:** multi-stage [Wolfi](https://github.com/wolfi-dev), with a digest-pinned base and version-pinned packages; no compiler in any stage
 - **User:** non-root, uid `10001`
 - Runs happily with `read_only: true` and `no-new-privileges`
 - Published with build provenance and an SBOM

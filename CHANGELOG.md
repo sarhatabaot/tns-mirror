@@ -10,6 +10,20 @@ schema change bumps the major on both.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Image builds failed** because Python came from Wolfi's rolling repository while the base image stayed pinned, so Python began to require a newer glibc than the base had. The base digest is updated, and every `apk` package in both images is now pinned to an exact version, transitive ones included, so the two cannot drift apart.
+
+### Changed
+
+- No image stage installs a compiler any more, because every dependency has a prebuilt wheel.
+- The builder copies `uv` from Astral's image, pinned by version and digest, instead of installing it with pip, so it no longer needs pip.
+- Bytecode is compiled at build time, so processes no longer recompile on each start. This adds about 4 MB to the server image and 34 MB to the API image.
+
+### Security
+
+- Update locked dependencies with known vulnerabilities: `certifi` 2026.10.23 and `urllib3` 2.8.0 in the server, `certifi` 2026.10.23 and `multidict` 6.9.1 in the API.
+
 ## [1.0.4] — 2026-08-05
 
 Ships the optional HTTP API, which 1.0.3 was meant to and did not: that tag was

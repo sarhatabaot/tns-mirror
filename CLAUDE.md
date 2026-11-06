@@ -4,6 +4,9 @@ A TNS→SQL mirror. Two artifacts from one repo: `tns-mirror-server` (Docker ima
 owns and writes the database) and `tns-mirror-client` (PyPI, v0.2, reads it).
 `schema/` is the contract between them.
 
+These are the project's rules. [`AGENTS.md`](AGENTS.md) is the general working
+baseline for any agent; where the two conflict, this file wins.
+
 ## Invariants — do not violate these
 
 1. **The database schema is the only contract.** The server is the sole writer;
@@ -75,7 +78,11 @@ not derived from `VERSION`; the check enforces that they match. Tags are bare
 
 ## Conventions
 
+- No AI or agent attribution in commit messages or pull request descriptions: no
+  `Co-Authored-By` trailer for an agent, no "Generated with" line.
+- Do not hard-wrap prose in Markdown files, PR descriptions, or issue and review comments. Break lines only where the structure needs it, such as paragraphs, list items, tables, and code blocks. Unneeded line breaks stop text from taking the full width of the page.
 - Python ≥ 3.13, uv, hatchling, ruff (lint + format).
+- Images are built on Wolfi. This is a requirement: do not switch the base to another distribution. Pin the base by digest and every `apk` package by exact version.
 - Dependencies are attack surface in a published image. The current set is
   `requests`, `psycopg`, `PyYAML`. Adding a fourth needs a reason; the cron
   parser is hand-written for exactly this reason.
