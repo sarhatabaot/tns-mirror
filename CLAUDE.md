@@ -80,6 +80,7 @@ not derived from `VERSION`; the check enforces that they match. Tags are bare
 
 - No AI or agent attribution in commit messages or pull request descriptions: no
   `Co-Authored-By` trailer for an agent, no "Generated with" line.
+- Do not hard-wrap prose in Markdown files, PR descriptions, or issue and review comments. Break lines only where the structure needs it, such as paragraphs, list items, tables, and code blocks. Unneeded line breaks stop text from taking the full width of the page.
 - Python ≥ 3.13, uv, hatchling, ruff (lint + format).
 - Dependencies are attack surface in a published image. The current set is
   `requests`, `psycopg`, `PyYAML`. Adding a fourth needs a reason; the cron

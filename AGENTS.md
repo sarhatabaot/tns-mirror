@@ -137,6 +137,8 @@ uvx pre-commit run --all-files --hook-stage manual   # everything CI runs
 
 Update documentation only when materially affected; do not create paperwork for trivial edits.
 
+Do not hard-wrap prose in Markdown files, PR descriptions, or issue and review comments. Break lines only where the structure needs it, such as paragraphs, list items, tables, and code blocks. Unneeded line breaks stop text from taking the full width of the page.
+
 | Location | Purpose |
 | --- | --- |
 | `docs/architecture.md` | Current components, boundaries, and interfaces |
