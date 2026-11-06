@@ -4,6 +4,9 @@ A TNS→SQL mirror. Two artifacts from one repo: `tns-mirror-server` (Docker ima
 owns and writes the database) and `tns-mirror-client` (PyPI, v0.2, reads it).
 `schema/` is the contract between them.
 
+These are the project's rules. [`AGENTS.md`](AGENTS.md) is the general working
+baseline for any agent; where the two conflict, this file wins.
+
 ## Invariants — do not violate these
 
 1. **The database schema is the only contract.** The server is the sole writer;
