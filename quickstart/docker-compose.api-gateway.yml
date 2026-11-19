@@ -22,7 +22,7 @@
 
 services:
   gateway:
-    image: nginx:1.27-alpine
+    image: nginx:1.31.9-alpine3.24@sha256:90b6bd2aec278b16b98221d64deb1d6d35d164567f507ab0716e6053878315aa
     depends_on: [api, api-batch]
 
     # Loopback only. The outer proxy runs on this host and is the sole route

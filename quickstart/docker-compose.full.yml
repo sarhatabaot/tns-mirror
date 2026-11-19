@@ -184,7 +184,7 @@ services:
   # Authenticates every caller by API key and picks the tier from the key's
   # name. The only published port in the stack.
   gateway:
-    image: nginx:1.27-alpine
+    image: nginx:1.31.9-alpine3.24@sha256:90b6bd2aec278b16b98221d64deb1d6d35d164567f507ab0716e6053878315aa
     # Started, not healthy: if the reader role does not exist yet the api
     # containers are still restarting, and the gateway should come up anyway
     # and say 502 rather than silently never starting.
