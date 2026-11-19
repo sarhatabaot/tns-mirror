@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
 
   server:
-    image: sarhatabaot/tns-mirror-server:1.0.5
+    image: sarhatabaot/tns-mirror-server:1.1.0
     depends_on:
       db:
         condition: service_healthy
@@ -216,7 +216,7 @@ cross-matching, no HTTP API — querying the catalogue belongs to the consumer, 
 
 ## Image
 
-- **Tags:** `1.0.5`, `1.0`, `latest`
+- **Tags:** `1.1.0`, `1.0`, `latest`
 - **Platforms:** `linux/amd64`, `linux/arm64`
 - **Base:** multi-stage [Wolfi](https://github.com/wolfi-dev), with a digest-pinned base and version-pinned packages; no compiler in any stage
 - **User:** non-root, uid `10001`

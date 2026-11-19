@@ -21,6 +21,7 @@ repository is public, so record nothing here that should stay private.
 - **Blockers:** None recorded
 - **Next step:** Run the Postgres integration tests, then add the typed client
   accessor that `CHANGELOG.md` lists as a follow-up, or decide to ship without it.
+- **Note:** The client's HTTP transport (branch `client-http-mode`) took version 1.1.0. Rebase this branch onto it and release as 1.2.0 instead.
 
 ## Suggested task entry
 

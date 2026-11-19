@@ -13,6 +13,8 @@ Optional. If your consumers speak Python and can reach the database, the
 everything else: a browser, another language, a network where only HTTP crosses
 the boundary.
 
+From Python, use the same [client]({{ '/client/' | url }}#over-http) with a `url` and an API key: it speaks this API and returns exactly what the SQL path returns.
+
 ```console
 $ curl 'https://your-host/v1/nearest?ra=203.1&dec=10.2&radius_arcsec=3'
 ```
@@ -26,6 +28,7 @@ $ curl 'https://your-host/v1/nearest?ra=203.1&dec=10.2&radius_arcsec=3'
   "type": "SN Ia",
   "redshift": 0.031,
   "internal_names": ["ZTF26aaa", "ATLAS26x"],
+  "internal_names_raw": "ZTF26aaa, ATLAS26x",
   "separation_arcsec": 0.354
 }
 ```
@@ -56,6 +59,7 @@ first.
 | `GET /v1/nearest?ra=&dec=&radius_arcsec=` | closest object, or `404` |
 | `GET /v1/cone?ra=&dec=&radius_arcsec=&limit=` | everything in range, nearest first |
 | `GET /v1/objects/{name}` | look up by IAU name |
+| `GET /v1/objects?name=&name=` | several names at once, ordered by objid; unknown names are absent |
 | `GET /v1/objid/{objid}` | look up by TNS objid |
 | `GET /v1/meta` | schema version, row count, freshness |
 | `GET /healthz` | liveness; does not touch the database |
@@ -143,8 +147,10 @@ and the [quickstart README]({{ site.repository }}/blob/main/quickstart/README.md
 
 `radius_arcsec` and `limit` are **clamped, not rejected**. A caller asking for
 too much gets the largest answer the service will serve rather than an error to
-handle, and `/v1/cone` echoes back the radius actually used. Rate limiting alone
+handle, and `/v1/cone` echoes back the radius and the limit actually used, with `truncated: true` when more objects lie in range than it returned. Rate limiting alone
 would not stop a single enormous query, which is what the caps are for.
+
+The Python client reads those fields and raises `QueryLimitExceeded` rather than hand back a short answer, because its SQL path has no cap.
 
 Defaults are one degree and 1000 results; both are configurable.
 

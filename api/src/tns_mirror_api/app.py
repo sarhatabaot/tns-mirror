@@ -35,7 +35,7 @@ from tns_mirror_client import SCHEMA_VERSION, SchemaVersionError, TnsMirror
 
 from . import __version__
 from .config import Config, load_config
-from .schemas import ConeOut, MetaOut, ObjectOut
+from .schemas import ConeOut, MetaOut, ObjectOut, ObjectsOut
 
 log = logging.getLogger("tns_mirror_api")
 
@@ -165,6 +165,27 @@ def by_name(state: State, name: FromPath[str]) -> ObjectOut:
     return ObjectOut.of(found)
 
 
+@get("/v1/objects", summary="Look up several IAU names at once", sync_to_thread=True)
+def by_names(
+    state: State,
+    name: Annotated[
+        list[str], QueryParameter(description="An IAU name; repeat for several", min_items=1)
+    ],
+) -> ObjectsOut:
+    """One round trip for many names, ordered by objid. Unknown names are absent."""
+    config: Config = state.config
+    unique = list(dict.fromkeys(name))
+    if len(unique) > config.max_limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"at most {config.max_limit} names per request, got {len(unique)}",
+        )
+    with state.pool.connection() as conn:
+        found = _mirror(state, config, conn).by_names(unique)
+    results = sorted(found.values(), key=lambda obj: obj.objid)
+    return ObjectsOut(count=len(results), results=[ObjectOut.of(obj) for obj in results])
+
+
 @get("/v1/objid/{objid:int}", summary="Look up by TNS objid", sync_to_thread=True)
 def by_objid(state: State, objid: FromPath[int]) -> ObjectOut:
     config: Config = state.config
@@ -183,9 +204,10 @@ def _check_position(ra: float, dec: float) -> None:
 
 
 def _capped_radius(config: Config, radius_arcsec: float) -> float:
-    if radius_arcsec <= 0:
+    # Zero is a valid cone, as in the client: it matches an exact position.
+    if radius_arcsec < 0:
         raise HTTPException(
-            status_code=400, detail=f"radius_arcsec must be positive, got {radius_arcsec}"
+            status_code=400, detail=f"radius_arcsec must not be negative, got {radius_arcsec}"
         )
     # Clamped rather than rejected: a caller asking for too much gets the
     # largest answer we will serve, not an error they have to handle. Rate
@@ -230,16 +252,20 @@ def cone(
     radius = _capped_radius(config, radius_arcsec)
     capped_limit = min(limit, config.max_limit)
 
+    # One row past the limit, so the response can say whether it was cut off.
     with state.pool.connection() as conn:
         found = _mirror(state, config, conn).search(
-            ra=ra, dec=dec, radius_arcsec=radius, limit=capped_limit
+            ra=ra, dec=dec, radius_arcsec=radius, limit=capped_limit + 1
         )
+    served = found[:capped_limit]
     return ConeOut(
         ra=ra,
         dec=dec,
         radius_arcsec=radius,
-        count=len(found),
-        results=[ObjectOut.of(obj) for obj in found],
+        limit=capped_limit,
+        count=len(served),
+        truncated=len(found) > capped_limit,
+        results=[ObjectOut.of(obj) for obj in served],
     )
 
 
@@ -259,7 +285,7 @@ def create_app(config: Config | None = None) -> Litestar:
     cors = CORSConfig(allow_origins=list(config.cors_origins)) if config.cors_origins else None
 
     app = Litestar(
-        route_handlers=[healthz, readyz, meta, by_name, by_objid, nearest, cone],
+        route_handlers=[healthz, readyz, meta, by_names, by_name, by_objid, nearest, cone],
         lifespan=[lifespan],
         middleware=[rate_limit.middleware],
         cors_config=cors,

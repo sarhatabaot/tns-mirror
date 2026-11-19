@@ -7,6 +7,10 @@
         if hit:
             print(hit.name, hit.type, hit.redshift)
 
+Or through the mirror's HTTP API, with ``pip install 'tns-mirror-client[http]'``:
+
+    TnsMirror(url="https://example.org/tns-mirror/api/", api_key=os.environ["KEY"])
+
 The library is the schema, packaged as a Python API. It reads; it never writes,
 and it carries no TNS credentials — those belong to the server. Connect with the
 read-only role the mirror's operator gives you.
@@ -18,16 +22,24 @@ published schema version on connect and refuses to guess.
 """
 
 from .client import SCHEMA_VERSION, TnsMirror
-from .errors import MirrorUnavailable, SchemaVersionError, TnsMirrorClientError
+from .errors import (
+    AccessDenied,
+    MirrorUnavailable,
+    QueryLimitExceeded,
+    SchemaVersionError,
+    TnsMirrorClientError,
+)
 from .geometry import angular_separation_deg, bounding_box
 from .models import MirrorMeta, TnsObject
 
-__version__ = "1.0.5"
+__version__ = "1.1.0"
 
 __all__ = [
     "SCHEMA_VERSION",
+    "AccessDenied",
     "MirrorMeta",
     "MirrorUnavailable",
+    "QueryLimitExceeded",
     "SchemaVersionError",
     "TnsMirror",
     "TnsMirrorClientError",

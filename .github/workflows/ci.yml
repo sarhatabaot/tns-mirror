@@ -169,6 +169,16 @@ jobs:
           TNS_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
         run: uv run pytest -m integration
 
+      # The client's HTTP transport must answer exactly as its SQL transport
+      # does. The lockfile pins the released client, so install the one in this
+      # commit over it for this step only; --no-sync stops uv from undoing that.
+      - name: Transport parity (client in this commit)
+        env:
+          TNS_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          uv pip install '../client[http]'
+          uv run --no-sync pytest -m integration tests/test_transport_parity.py
+
   # The client claims to support 3.11+, so it is tested there, not only on the
   # version the developers happen to run.
   client-python-versions:

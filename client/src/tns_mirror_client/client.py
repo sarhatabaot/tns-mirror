@@ -3,6 +3,10 @@
 Connects with read-only credentials and returns typed results. It never writes,
 carries no TNS credentials — those are a *server* concern — and shares no code
 with the server. The only thing the two have in common is the schema.
+
+Two transports, one API. With ``dsn`` or ``connection`` it queries Postgres
+itself. With ``url`` it asks a ``tns-mirror-api``, which runs this same SQL path
+on the server, so the two cannot disagree about a cone.
 """
 
 from __future__ import annotations
@@ -11,7 +15,7 @@ import logging
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from types import TracebackType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import psycopg
 from psycopg import sql
@@ -21,6 +25,11 @@ from .errors import MirrorUnavailable, SchemaVersionError
 from .geometry import bounding_box
 from .models import CATALOGUE_COLUMNS, MirrorMeta, TnsObject
 
+if TYPE_CHECKING:
+    import requests
+
+    from ._http import HttpMirror, Timeout
+
 log = logging.getLogger(__name__)
 
 __all__ = ["SCHEMA_VERSION", "TnsMirror"]
@@ -29,6 +38,11 @@ __all__ = ["SCHEMA_VERSION", "TnsMirror"]
 SCHEMA_VERSION = 1
 
 _ARCSEC_PER_DEG = 3600.0
+
+#: Seconds, for both connecting and reading, on the HTTP transport. Kept equal
+#: to ``_http.DEFAULT_TIMEOUT``, which a test checks; it lives here too so that
+#: the signature does not import ``requests``.
+DEFAULT_TIMEOUT = 5.0
 
 # Great-circle separation in degrees, by the haversine formula — the same one
 # geometry.angular_separation_deg computes in Python, so the two cannot drift.
@@ -55,8 +69,12 @@ class TnsMirror:
     >>> if hit:
     ...     print(hit.name, hit.type, hit.redshift)
 
+    Or over the mirror's HTTP API, with the same methods and the same answers:
+
+    >>> tns = TnsMirror(url="https://example.org/tns-mirror/api/", api_key=key)
+
     Use it as a context manager, or call :meth:`close`, to release the
-    connection. The connection is opened lazily on first use.
+    connection or session. Either is opened lazily on first use.
     """
 
     def __init__(
@@ -64,20 +82,57 @@ class TnsMirror:
         dsn: str | None = None,
         *,
         connection: psycopg.Connection | None = None,
+        url: str | None = None,
+        api_key: str | None = None,
+        timeout: Timeout = DEFAULT_TIMEOUT,
+        trust_env: bool = True,
+        session: requests.Session | None = None,
         schema: str = "public",
         table: str = "tns_objects",
         check_schema_version: bool = True,
     ) -> None:
         """
+        Pass exactly one of ``dsn``, ``connection`` or ``url``.
+
         ``dsn`` is a read-only connection string. Pass ``connection`` instead to
         reuse one you already manage (from a pool, say) — the client will not
         close what it did not open.
 
         ``schema`` and ``table`` only need setting if the mirror was deployed
         with non-default ``TNS_SCHEMA``/``TNS_TABLE``.
+
+        ``url`` is the base URL of a ``tns-mirror-api``, and needs the ``http``
+        extra (``pip install 'tns-mirror-client[http]'``). ``api_key`` is then
+        required and goes in the ``X-API-Key`` header, never in the URL.
+        ``timeout`` is seconds for connecting and for reading, or a
+        ``(connect, read)`` pair. ``trust_env=False`` ignores ``HTTP_PROXY``,
+        ``HTTPS_PROXY`` and ``NO_PROXY``; the default honours them. Pass
+        ``session`` to reuse a ``requests.Session`` you manage; the client will
+        not close it, and ``trust_env`` is then yours to set on it.
         """
-        if dsn is None and connection is None:
-            raise ValueError("TnsMirror needs either a dsn or a connection")
+        given = [dsn is not None, connection is not None, url is not None]
+        if sum(given) != 1:
+            raise ValueError("TnsMirror needs exactly one of dsn, connection or url")
+        if url is None and (api_key is not None or session is not None):
+            raise ValueError("api_key and session apply only with url")
+        if url is not None and (schema, table) != ("public", "tns_objects"):
+            raise ValueError(
+                "schema and table are the API's configuration over HTTP; set "
+                "TNS_SCHEMA and TNS_TABLE on the API instead"
+            )
+
+        self._http: HttpMirror | None = None
+        if url is not None:
+            try:
+                from ._http import HttpMirror
+            except ImportError as exc:  # pragma: no cover - depends on the install
+                raise ImportError(
+                    "TnsMirror(url=...) needs the http extra: "
+                    "pip install 'tns-mirror-client[http]'"
+                ) from exc
+            self._http = HttpMirror(
+                url, api_key, timeout=timeout, trust_env=trust_env, session=session
+            )
 
         self._dsn = dsn
         self._conn = connection
@@ -86,6 +141,12 @@ class TnsMirror:
         self._table = table
         self._check_version = check_schema_version
         self._verified = False
+
+    def __repr__(self) -> str:
+        # Never the DSN (it may hold a password) and never the key.
+        if self._http is not None:
+            return f"TnsMirror(url={self._http.url!r})"
+        return f"TnsMirror(schema={self._schema!r}, table={self._table!r})"
 
     # --- connection ---------------------------------------------------------
 
@@ -127,6 +188,18 @@ class TnsMirror:
             raise SchemaVersionError(found=found, expected=SCHEMA_VERSION)
         self._verified = True
 
+    def _api(self) -> HttpMirror:
+        """The HTTP transport, its schema version checked on first use."""
+        http = self._http
+        if http is None:  # pragma: no cover - only reachable via misuse
+            raise MirrorUnavailable("no HTTP transport")
+        if self._check_version and not self._verified:
+            found = http.meta()[0].schema_version
+            if found != SCHEMA_VERSION:
+                raise SchemaVersionError(found=found, expected=SCHEMA_VERSION)
+            self._verified = True
+        return http
+
     @contextmanager
     def _cursor(self) -> Iterator[psycopg.Cursor]:
         conn = self._connect()
@@ -134,7 +207,11 @@ class TnsMirror:
             yield cur
 
     def close(self) -> None:
-        """Close the connection, if this client opened it."""
+        """Close the connection or session, if this client opened it."""
+        if self._http is not None:
+            self._http.close()
+            self._verified = False
+            return
         if self._conn is not None and self._owns_connection:
             self._conn.close()
             self._conn = None
@@ -186,6 +263,9 @@ class TnsMirror:
             raise ValueError(f"radius_arcsec must not be negative, got {radius_arcsec}")
         if limit is not None and limit < 1:
             raise ValueError(f"limit must be at least 1, got {limit}")
+
+        if self._http is not None:
+            return self._api().search(ra, dec, radius_arcsec, limit)
 
         radius_deg = radius_arcsec / _ARCSEC_PER_DEG
         box = bounding_box(ra, dec, radius_deg)
@@ -246,6 +326,9 @@ class TnsMirror:
         rename that transiently collides — so this orders by ``objid`` and
         returns the first, rather than pretending the case cannot arise.
         """
+        if self._http is not None:
+            return self._api().by_name(name)
+
         statement = sql.SQL(
             "SELECT {columns} FROM {table} WHERE name = %(name)s ORDER BY objid LIMIT 1"
         ).format(columns=self._columns(), table=self._catalogue)
@@ -257,6 +340,9 @@ class TnsMirror:
 
     def by_objid(self, objid: int) -> TnsObject | None:
         """Look up one object by its stable TNS identifier (the primary key)."""
+        if self._http is not None:
+            return self._api().by_objid(objid)
+
         statement = sql.SQL("SELECT {columns} FROM {table} WHERE objid = %(objid)s").format(
             columns=self._columns(), table=self._catalogue
         )
@@ -274,6 +360,8 @@ class TnsMirror:
         """
         if not names:
             return {}
+        if self._http is not None:
+            return self._api().by_names(names)
 
         statement = sql.SQL(
             "SELECT {columns} FROM {table} WHERE name = ANY(%(names)s) ORDER BY objid"
@@ -286,6 +374,9 @@ class TnsMirror:
 
     def count(self) -> int:
         """How many objects the mirror currently holds."""
+        if self._http is not None:
+            return self._api().meta()[1]
+
         statement = sql.SQL("SELECT count(*) AS n FROM {}").format(self._catalogue)
         with self._cursor() as cur:
             cur.execute(statement)
@@ -298,6 +389,10 @@ class TnsMirror:
         Check :meth:`MirrorMeta.is_fresh` before trusting a batch job: a row
         count cannot tell you whether the mirror stopped syncing weeks ago.
         """
+        if self._http is not None:
+            http = self._http if _skip_verification else self._api()
+            return http.meta()[0]
+
         statement = sql.SQL(
             "SELECT schema_version, last_full_sync_at, last_delta_sync_at, "
             "last_source_snapshot FROM {} WHERE id = 1"

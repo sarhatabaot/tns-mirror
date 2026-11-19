@@ -10,6 +10,29 @@ schema change bumps the major on both.
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-11-18
+
+The client can now read the mirror through its HTTP API, with an API key, as well as through PostgreSQL. Schema is **unchanged at v1**, and nothing existing changes for a client on a DSN.
+
+### Added
+
+- **`TnsMirror(url=..., api_key=...)`**: the same methods and the same `TnsObject` and `MirrorMeta` results over `tns-mirror-api`. Install it with `pip install 'tns-mirror-client[http]'`; the `http` extra adds `requests`, and only the HTTP path imports it. Exactly one of `dsn`, `connection` or `url` is accepted.
+  - The key travels only in the `X-API-Key` header, never in a URL, a log line, an exception or a `repr()`.
+  - Every request has a connect and a read timeout, 5 seconds by default. One session is reused and is closed by `close()` and the context manager.
+  - Proxies follow `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` by default; `trust_env=False` ignores them. Certificates are verified, and redirects are not followed, so the key cannot be carried to another host.
+  - The schema version is checked on first use, as over SQL.
+- **`AccessDenied`**, raised when the API refuses the key (HTTP 401 or 403), and **`QueryLimitExceeded`**, raised when the API clamped a query and would have returned fewer results than exist. Both subclass `TnsMirrorClientError`, and over HTTP a timeout, an unreachable host, a 5xx or a 429 is `MirrorUnavailable`, so one `except TnsMirrorClientError` covers both transports.
+- **API: `GET /v1/objects?name=…&name=…`**, several names in one request, for the client's `by_names`.
+- **API: `/v1/cone` reports `limit` and `truncated`**, so a caller can tell a complete answer from one cut off by the server's limit.
+- **API: objects carry `internal_names_raw`**, the stored comma-separated string, next to the split `internal_names` list, so the client returns exactly what the SQL path returns.
+- A CI step runs the client's two transports against the same seeded mirror and asserts equal results for `nearest`, `search` (the 0/360 seam, both poles, ties, a zero radius), the lookups, `count` and `meta`.
+
+### Changed
+
+- `TnsMirror()` with no transport now says "needs exactly one of dsn, connection or url".
+- `repr(TnsMirror(...))` shows the URL, or the schema and table, and never a DSN or key.
+- **API: `radius_arcsec=0` is accepted** and matches an exact position, as it does in the client. Only a negative radius is a `400`.
+
 ## [1.0.5] — 2026-11-06
 
 Upgrade from 1.0.4 now: TNS rejects the download path that 1.0.4 uses by default, so its syncs fail. Schema is **unchanged at v1**.

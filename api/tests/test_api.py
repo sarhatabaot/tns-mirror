@@ -124,6 +124,27 @@ def test_by_name(client):
     assert body["separation_arcsec"] is None
 
 
+def test_by_name_carries_the_stored_internal_names_unchanged(client):
+    body = client.get("/v1/objects/SN2026xyz").json()
+    assert body["internal_names_raw"] == "ZTF26aaa, ATLAS26x"
+
+
+def test_by_names_returns_the_known_ones_ordered_by_objid(client):
+    body = client.get("/v1/objects?name=AT2026far&name=SN1987A&name=AT2026abc").json()
+    assert body["count"] == 2
+    assert [r["objid"] for r in body["results"]] == [1, 3]
+
+
+def test_by_names_needs_at_least_one_name(client):
+    assert client.get("/v1/objects").status_code == 400
+
+
+def test_by_names_refuses_more_names_than_the_limit(schema):
+    with make_client(schema, max_limit=2) as client:
+        response = client.get("/v1/objects?name=a&name=b&name=c")
+    assert response.status_code == 400
+
+
 def test_by_name_missing_is_404(client):
     assert client.get("/v1/objects/SN1987A").status_code == 404
 
@@ -177,9 +198,14 @@ def test_positions_off_the_sphere_are_rejected(client, query):
     assert client.get(f"/v1/nearest?{query}").status_code == 400
 
 
-@pytest.mark.parametrize("radius", ["0", "-5"])
-def test_a_non_positive_radius_is_rejected(client, radius):
-    assert client.get(f"/v1/nearest?ra=1&dec=1&radius_arcsec={radius}").status_code == 400
+def test_a_negative_radius_is_rejected(client):
+    assert client.get("/v1/nearest?ra=1&dec=1&radius_arcsec=-5").status_code == 400
+
+
+def test_a_zero_radius_matches_an_exact_position(client):
+    # As in the client: a cone of radius zero is valid, not an error.
+    body = client.get("/v1/cone?ra=203.1&dec=10.2&radius_arcsec=0").json()
+    assert [r["name"] for r in body["results"]] == ["AT2026abc"]
 
 
 def test_an_oversized_radius_is_clamped_not_rejected(schema):
@@ -190,10 +216,19 @@ def test_an_oversized_radius_is_clamped_not_rejected(schema):
     assert body["radius_arcsec"] == 60.0
 
 
-def test_an_oversized_limit_is_clamped(schema):
+def test_an_oversized_limit_is_clamped_and_says_so(schema):
     with make_client(schema, max_limit=2) as client:
         body = client.get("/v1/cone?ra=203.1&dec=10.2&radius_arcsec=400&limit=100").json()
     assert body["count"] == 2
+    assert body["limit"] == 2
+    # Three objects lie in range; without this a caller cannot tell.
+    assert body["truncated"] is True
+
+
+def test_a_cone_that_fits_its_limit_is_not_truncated(client):
+    body = client.get("/v1/cone?ra=203.1&dec=10.2&radius_arcsec=400&limit=3").json()
+    assert body["count"] == 3
+    assert body["truncated"] is False
 
 
 # --- rate limiting -----------------------------------------------------------

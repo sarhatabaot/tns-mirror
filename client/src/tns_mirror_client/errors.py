@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-__all__ = ["MirrorUnavailable", "SchemaVersionError", "TnsMirrorClientError"]
+__all__ = [
+    "AccessDenied",
+    "MirrorUnavailable",
+    "QueryLimitExceeded",
+    "SchemaVersionError",
+    "TnsMirrorClientError",
+]
 
 
 class TnsMirrorClientError(Exception):
@@ -28,4 +34,25 @@ class SchemaVersionError(TnsMirrorClientError):
 
 
 class MirrorUnavailable(TnsMirrorClientError):
-    """The mirror could not be reached, or is not a tns-mirror database."""
+    """The mirror could not be reached, or is not a tns-mirror database.
+
+    Over HTTP this also covers a timeout, a 5xx, a rate limit (429), and a URL
+    that does not answer like a tns-mirror API.
+    """
+
+
+class AccessDenied(TnsMirrorClientError):
+    """The mirror's HTTP API refused the API key (HTTP 401 or 403).
+
+    The message never contains the key. Retrying with the same key will not
+    help; the key is wrong, revoked, or not sent where the operator expects it.
+    """
+
+
+class QueryLimitExceeded(TnsMirrorClientError):
+    """The mirror's HTTP API would have answered with fewer results than exist.
+
+    The API caps the radius and the number of results it serves in one query.
+    Over SQL there is no cap, so rather than quietly return a partial answer
+    over HTTP, the client raises this. Narrow the radius or pass a ``limit``.
+    """

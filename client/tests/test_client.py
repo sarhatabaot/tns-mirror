@@ -348,5 +348,5 @@ def test_a_borrowed_connection_is_not_closed_by_the_client(schema):
 
 
 def test_a_client_needs_something_to_connect_with():
-    with pytest.raises(ValueError, match="needs either a dsn or a connection"):
+    with pytest.raises(ValueError, match="needs exactly one of dsn, connection or url"):
         TnsMirror()

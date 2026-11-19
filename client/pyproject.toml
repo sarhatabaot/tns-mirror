@@ -6,8 +6,8 @@ build-backend = "hatchling.build"
 name = "tns-mirror-client"
 # 1.x speaks schema v1 (see schema/README.md). The major tracks the contract,
 # not the project milestone, so consumers can pin 'tns-mirror-client>=1,<2'.
-version = "1.0.5"
-description = "Typed, read-only Python client for a tns-mirror TNS catalogue database."
+version = "1.1.0"
+description = "Typed, read-only Python client for a tns-mirror TNS catalogue, over SQL or HTTP."
 readme = "README.md"
 # Deliberately wider than the server's floor: this is embedded in other people's
 # applications, and a client that forces a Python upgrade is a client nobody adopts.
@@ -29,6 +29,11 @@ classifiers = [
 # every dependency it carries becomes theirs — hence dataclasses, not pydantic.
 dependencies = ["psycopg[binary]>=3.1"]
 
+# Reading through the mirror's HTTP API instead of Postgres. An extra rather
+# than a dependency, so a consumer on the SQL path carries nothing new.
+[project.optional-dependencies]
+http = ["requests>=2.32"]
+
 [project.urls]
 Homepage = "https://github.com/sarhatabaot/tns-mirror"
 Documentation = "https://github.com/sarhatabaot/tns-mirror/tree/main/client"
@@ -36,6 +41,7 @@ Changelog = "https://github.com/sarhatabaot/tns-mirror/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
+  "requests>=2.32",
   "pytest>=8.3.3",
   "pytest-cov>=5.0.0",
   "ruff>=0.7.0",

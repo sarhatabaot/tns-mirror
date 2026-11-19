@@ -321,7 +321,7 @@ wheels = [
 
 [[package]]
 name = "tns-mirror-server"
-version = "1.0.5"
+version = "1.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "psycopg", extra = ["binary"] },

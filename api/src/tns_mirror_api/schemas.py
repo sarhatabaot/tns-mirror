@@ -13,7 +13,7 @@ from datetime import date, datetime
 
 from tns_mirror_client import MirrorMeta, TnsObject
 
-__all__ = ["ConeOut", "MetaOut", "ObjectOut"]
+__all__ = ["ConeOut", "MetaOut", "ObjectOut", "ObjectsOut"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +29,10 @@ class ObjectOut:
     discoverydate: datetime | None
     discoverymag: float | None
     internal_names: list[str]
+    #: ``internal_names`` exactly as TNS publishes it, comma-separated, or
+    #: null. The list above is for people; this is for a client that must
+    #: return the stored value unchanged, as tns-mirror-client does.
+    internal_names_raw: str | None
     reporting_group: str | None
     source_snapshot: date
     refreshed_at: datetime
@@ -50,6 +54,7 @@ class ObjectOut:
             # A list rather than TNS's comma-separated string: every consumer
             # would otherwise split it themselves, and some would get it wrong.
             internal_names=obj.internal_name_list,
+            internal_names_raw=obj.internal_names,
             reporting_group=obj.reporting_group,
             source_snapshot=obj.source_snapshot,
             refreshed_at=obj.refreshed_at,
@@ -84,12 +89,26 @@ class MetaOut:
 class ConeOut:
     """A cone search result.
 
-    Echoes the query back because the radius may have been clamped, and a caller
-    comparing counts across requests needs to know what was actually searched.
+    Echoes the query back because the radius and the limit may have been
+    clamped, and a caller comparing counts across requests needs to know what
+    was actually searched.
     """
 
     ra: float
     dec: float
     radius_arcsec: float
+    #: The most results this response could hold, after clamping.
+    limit: int
+    count: int
+    #: More objects lie within the radius than ``results`` holds. Without it a
+    #: caller cannot tell a complete answer from one cut off at ``limit``.
+    truncated: bool
+    results: list[ObjectOut]
+
+
+@dataclass(frozen=True, slots=True)
+class ObjectsOut:
+    """A lookup of several names. Names with no match are simply absent."""
+
     count: int
     results: list[ObjectOut]

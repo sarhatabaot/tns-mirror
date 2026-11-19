@@ -21,6 +21,7 @@ handed a privileged role by mistake.
 | `GET /v1/nearest?ra=&dec=&radius_arcsec=` | closest object, or 404 |
 | `GET /v1/cone?ra=&dec=&radius_arcsec=&limit=` | everything in range, nearest first |
 | `GET /v1/objects/{name}` | look up by IAU name |
+| `GET /v1/objects?name=&name=` | several names at once, ordered by objid; unknown names are absent |
 | `GET /v1/objid/{objid}` | look up by TNS objid |
 | `GET /v1/meta` | schema version, row count, freshness |
 | `GET /healthz` | liveness; does not touch the database |
@@ -91,15 +92,17 @@ rather than to your proxy.
 
 `radius_arcsec` and `limit` are **clamped, not rejected** — a caller asking for
 too much gets the largest answer the service will serve rather than an error to
-handle. `/v1/cone` echoes back the radius actually used. Rate limiting alone
+handle. `/v1/cone` echoes back the radius and the limit actually used, and sets `truncated` when more objects lie in range than it returned. Rate limiting alone
 would not stop a single enormous query.
+
+A `radius_arcsec` of 0 is valid and matches an exact position, as in the client. `/v1/objects?name=` takes at most `TNS_API_MAX_LIMIT` names per request.
 
 ## Running it
 
 ```console
 $ docker run --rm -p 8000:8000 \
     -e PGHOST=your-db -e PGUSER=tns_ro -e PGPASSWORD=... -e PGDATABASE=tnsdb \
-    sarhatabaot/tns-mirror-api:1.0.5
+    sarhatabaot/tns-mirror-api:1.1.0
 ```
 
 Use the `tns_ro` credentials from `tns-mirror-server print-grants`, never the
